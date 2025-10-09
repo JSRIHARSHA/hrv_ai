@@ -46,6 +46,7 @@ import {
 } from '../data/constants';
 import AppBanner from '../components/AppBanner';
 import CreateOrderModal from '../components/CreateOrderModal';
+import { PDFExtractorService } from '../services/pdfExtractorService';
 import toast from 'react-hot-toast';
 
 const DashboardPage: React.FC = () => {
@@ -164,100 +165,23 @@ const DashboardPage: React.FC = () => {
       const isPDFExtraction = extractedData && extractedData.data && extractedData.data.PO_NUMBER;
       
       if (isPDFExtraction) {
-        // Handle PDF extraction result
-        const pdfData = extractedData.data;
+        // Handle PDF extraction result using the PDF extraction service
+        const pdfExtractor = PDFExtractorService.getInstance();
+        const newOrder = pdfExtractor.convertExtractedDataToOrder(extractedData, user?.userId || 'system');
         
-        // Create the order using PDF extraction data
-      const newOrder = createOrder({
-          // Customer information (default for PDF extraction)
-          customer: {
-            name: 'Pharmaceutical Customer',
-            address: 'Customer Address',
-            country: 'India',
-            email: 'customer@example.com',
-            phone: 'Customer Contact',
-            gstin: 'CUSTOMER_GSTIN'
-          },
-          // Supplier information from PDF extraction
-        supplier: orderData.supplier,
-          // Material information from PDF extraction
-          materialName: pdfData.MATERIAL || 'Extracted Material',
-          materials: [{
-            id: 'material-1',
-            name: pdfData.MATERIAL || 'Extracted Material',
-            sku: '',
-            description: pdfData.MATERIAL || 'Material extracted from PDF',
-            quantity: {
-              value: pdfData.QUANTITY || 1,
-              unit: 'Kg'
-            },
-            unitPrice: {
-              amount: parseFloat(pdfData.UNIT_PRICE || '0'),
-              currency: pdfData.CURRENCY || 'USD'
-            },
-            totalPrice: {
-              amount: parseFloat(pdfData.TOTAL_AMOUNT || '0'),
-              currency: pdfData.CURRENCY || 'USD'
-            }
-          }],
-          quantity: {
-            value: pdfData.QUANTITY || 1,
-            unit: 'Kg'
-          },
-          priceToCustomer: {
-            amount: parseFloat(pdfData.TOTAL_AMOUNT || '0') * 1.1, // Add 10% margin
-            currency: pdfData.CURRENCY || 'USD'
-          },
-          priceFromSupplier: {
-            amount: parseFloat(pdfData.TOTAL_AMOUNT || '0'),
-            currency: pdfData.CURRENCY || 'USD'
-          },
-          status: 'PO_Received_from_Client',
-          poNumber: pdfData.PO_NUMBER || `AUTO-${Date.now()}`,
-          deliveryTerms: pdfData.DELIVERY_TERMS || 'FOB',
-          notes: `Order created from PDF upload using AI extraction. PO: ${pdfData.PO_NUMBER || 'N/A'}, Company: ${pdfData.PO_ISSUER_NAME || 'N/A'}`,
-          orderId: pdfData.PO_NUMBER || `ORD-${Date.now()}`,
-          entity: 'HRV', // Default entity
-          // Documents section - include the uploaded PDF
-          documents: {
-            customerPO: {
-              id: `doc_${Date.now()}`,
-              filename: orderData.pdfFile?.name || 'uploaded_po.pdf',
-              uploadedAt: new Date().toISOString(),
-              uploadedBy: {
-                userId: user?.userId || 'current-user',
-                name: user?.name || 'Current User'
-              },
-              fileSize: orderData.pdfFile?.size || 0,
-              mimeType: 'application/pdf'
-            }
-          },
-          timeline: [{
-            id: `timeline-${Date.now()}`,
-            timestamp: new Date().toISOString(),
-            event: 'Order Created',
-            actor: {
-              userId: user?.userId || 'current-user',
-              name: user?.name || 'Current User',
-              role: user?.role || 'Employee'
-            },
-            details: 'Order created from PDF upload using AI extraction',
-            status: 'PO_Received_from_Client'
-          }]
-        });
+        // Create the order using the converted data
+        const createdOrder = createOrder(newOrder);
         
-        console.log('Created order with documents:', newOrder.documents);
-        
-        console.log('New order created from PDF:', newOrder);
+        console.log('Created order with extracted customer data:', createdOrder);
         
         // Redirect to the order detail page
-        navigate(`/order/${newOrder.orderId}?created=true`);
+        navigate(`/order/${createdOrder.orderId}?created=true`);
         
         // Close the modal
         setCreateOrderOpen(false);
         
         // Show success message
-        toast.success(`Order ${newOrder.orderId} created successfully from PDF!`);
+        toast.success(`Order ${createdOrder.orderId} created successfully from PDF!`);
         
       } else {
         // No PDF extraction result available, but still create order with uploaded PDF if available
