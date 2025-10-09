@@ -167,14 +167,14 @@ export class PDFExtractorService {
       },
       status: 'PO_Received_from_Client' as OrderStatus,
       
-      // Customer information
+      // Customer information - populate from extracted PDF data
       customer: {
-        name: 'Pharmaceutical Customer',
-        address: 'Customer Address',
+        name: data.PO_ISSUER_NAME || 'Pharmaceutical Customer',
+        address: data.PO_ISSUER_ADDRESS || 'Customer Address',
         country: 'India',
         email: 'customer@example.com',
-        phone: 'Customer Contact',
-        gstin: 'CUSTOMER_GSTIN'
+        phone: data.CONTACT_NUMBER || 'Customer Contact',
+        gstin: data.GSTIN || 'CUSTOMER_GSTIN'
       },
       
       // Supplier information
