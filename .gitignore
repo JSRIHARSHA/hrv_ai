@@ -66,3 +66,7 @@ uploads/
 
 # Heroku
 .heroku/
+.vercel
+
+# Local Netlify folder
+.netlify
