@@ -167,7 +167,7 @@ const DashboardPage: React.FC = () => {
       if (isPDFExtraction) {
         // Handle PDF extraction result using the PDF extraction service
         const pdfExtractor = PDFExtractorService.getInstance();
-        const newOrder = pdfExtractor.convertExtractedDataToOrder(extractedData, user?.userId || 'system');
+        const newOrder = pdfExtractor.convertExtractedDataToOrder(extractedData, user?.userId || 'system', orderData.supplier);
         
         // Create the order using the converted data
         const createdOrder = createOrder(newOrder);

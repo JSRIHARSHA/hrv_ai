@@ -123,11 +123,11 @@ export class PDFExtractorService {
   /**
    * Convert extracted PDF data to Order object
    */
-  public convertExtractedDataToOrder(extractedData: PDFExtractionResult, uploadedBy: string): Order {
+  public convertExtractedDataToOrder(extractedData: PDFExtractionResult, uploadedBy: string, selectedSupplier?: ContactInfo): Order {
     const data = extractedData.data;
     
-    // Create supplier from extracted data
-    const supplier: ContactInfo = {
+    // Use selected supplier from dropdown, or create supplier from extracted data as fallback
+    const supplier: ContactInfo = selectedSupplier || {
       name: data.PO_ISSUER_NAME || 'Unknown Supplier',
       address: data.PO_ISSUER_ADDRESS || 'Address not provided',
       country: 'India', // Default, could be extracted from address
