@@ -1,0 +1,23 @@
+# Python dependencies for PDF extraction
+# Install with: pip install -r requirements.txt
+
+# Core PDF processing
+PyMuPDF==1.23.8
+
+# Additional utilities (optional)
+Pillow==10.0.1
+numpy==1.24.3
+
+# For better text processing
+regex==2023.8.8
+
+# For JSON handling (built-in, but explicit for clarity)
+# json - built-in module
+
+# For logging (built-in)
+# logging - built-in module
+
+# For file operations (built-in)
+# pathlib - built-in module
+# os - built-in module
+# argparse - built-in module
