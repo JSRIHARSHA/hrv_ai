@@ -22,6 +22,7 @@ interface NHGOrderData {
     rate: number;
     amount: number;
   }>;
+  taxRate?: number;
 }
 
 /**
@@ -41,9 +42,10 @@ export async function generateFilledPO(templateUrl: string, orderData: NHGOrderD
   // Step 1: Extract text positions (anchor detection)
   const anchors = await extractKeywordPositions(page);
 
-  // Step 2: Compute IGST (0.1%) and Total
+  // Step 2: Compute IGST (using selected tax rate) and Total
   const totalAmount = orderData.line_items.reduce((sum, i) => sum + i.amount, 0);
-  const igst = +(totalAmount * 0.001).toFixed(2);
+  const taxRate = orderData.taxRate || 0.1; // Default to 0.1% if not specified
+  const igst = +(totalAmount * (taxRate / 100)).toFixed(2); // Convert percentage to decimal
   const grandTotal = +(totalAmount + igst).toFixed(2);
 
   // Step 3: Map anchors to values
@@ -133,7 +135,7 @@ export async function previewFilledPO(templateUrl: string, orderData: NHGOrderDa
 }
 
 // Convert Order to NHGOrderData
-export function convertOrderToNHGData(order: Order): NHGOrderData {
+export function convertOrderToNHGData(order: Order, taxRate: number = 0.1): NHGOrderData {
   return {
     po_number: order.poNumber || `NHG${Date.now()}`,
     po_date: order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB'),
@@ -153,12 +155,13 @@ export function convertOrderToNHGData(order: Order): NHGOrderData {
       rate: material.unitPrice.amount,
       amount: material.totalPrice.amount
     })),
+    taxRate: taxRate,
   };
 }
 
 // Preview NHG PO from Order (main function to be used in components)
-export async function previewNHGPOFromOrder(order: Order): Promise<string> {
+export async function previewNHGPOFromOrder(order: Order, taxRate: number = 0.1): Promise<string> {
   const templateUrl = '/NHG_PO_FORMAT.pdf';
-  const orderData = convertOrderToNHGData(order);
+  const orderData = convertOrderToNHGData(order, taxRate);
   return await previewFilledPO(templateUrl, orderData);
 }

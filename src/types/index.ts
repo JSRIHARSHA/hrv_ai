@@ -43,6 +43,7 @@ export interface Document {
   };
   fileSize?: number;
   mimeType?: string;
+  data?: string; // Base64 data URL for the document content
 }
 
 export interface Documents {
@@ -230,6 +231,31 @@ export interface EmailTemplate {
   recipients: string[];
   cc?: string[];
   attachments?: string[];
+}
+
+// Purchase Order (for Gemini AI extraction)
+export interface PurchaseOrderItem {
+  materialName: string;
+  materialGrade?: string | null;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+export interface PurchaseOrder {
+  poNumber?: string | null;
+  issueDate?: string | null;
+  customerName?: string | null;
+  customerAddress?: string | null;
+  customerEmail?: string | null;
+  customerContact?: string | null;
+  customerGstin?: string | null;
+  shipmentDetails?: string | null;
+  items: PurchaseOrderItem[];
+  subtotal?: number | null;
+  tax?: number | null;
+  totalAmount?: number | null;
+  currency?: string | null;
 }
 
 // PDF Generation Data

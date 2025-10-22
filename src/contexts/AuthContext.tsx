@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
 import { mockUsers } from '../data/constants';
+import { authAPI } from '../services/apiService';
 
 interface AuthContextType {
   user: User | null;
@@ -36,26 +37,45 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Find user by email (in real app, this would be an API call)
-    const foundUser = mockUsers.find(u => u.email === email && u.isActive);
-    
-    if (foundUser && password === 'password123') { // Simple password for demo
-      setUser(foundUser);
-      localStorage.setItem('user', JSON.stringify(foundUser));
-      setIsLoading(false);
-      return true;
+    try {
+      // Try API login first
+      const response = await authAPI.login(email, password);
+      
+      if (response.user && response.token) {
+        setUser(response.user);
+        localStorage.setItem('user', JSON.stringify(response.user));
+        localStorage.setItem('token', response.token);
+        setIsLoading(false);
+        return true;
+      }
+    } catch (error) {
+      console.log('API login failed, falling back to mock login:', error);
+      
+      // Fallback to mock login if API is not available
+      const foundUser = mockUsers.find(u => u.email === email && u.isActive);
+      
+      if (foundUser && password === 'password123') {
+        setUser(foundUser);
+        localStorage.setItem('user', JSON.stringify(foundUser));
+        setIsLoading(false);
+        return true;
+      }
     }
     
     setIsLoading(false);
     return false;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await authAPI.logout();
+    } catch (error) {
+      console.log('API logout failed:', error);
+    }
+    
     setUser(null);
     localStorage.removeItem('user');
+    localStorage.removeItem('token');
   };
 
   const value: AuthContextType = {

@@ -3,11 +3,13 @@ import { Order, Comment, AuditLog, TimelineEvent, Documents } from '../types';
 import { mockOrders } from '../data/mockData';
 import { useAuth } from './AuthContext';
 import { ExcelService } from '../services/excelService';
+import { ordersAPI } from '../services/apiService';
+import { generateOrderId } from '../utils/orderIdGenerator';
 
 interface OrderContextType {
   orders: Order[];
   getOrderById: (orderId: string) => Order | undefined;
-  createOrder: (orderData: Partial<Order>) => Order;
+  createOrder: (orderData: Partial<Order>) => Promise<Order>;
   updateOrderStatus: (orderId: string, newStatus: string, note?: string) => void;
   addComment: (orderId: string, message: string, isInternal?: boolean) => void;
   addAuditLog: (orderId: string, fieldChanged: string, oldValue: any, newValue: any, note?: string) => void;
@@ -33,19 +35,38 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
   const { user } = useAuth();
 
   useEffect(() => {
-    // Try to load from localStorage first, then fallback to mock data
+    // Try to load from API first, then fallback to localStorage, then mock data
     const loadInitialData = async () => {
       setIsLoading(true);
       try {
+        // Try to load from API if user is authenticated
+        if (user) {
+          try {
+            const apiOrders = await ordersAPI.getUserOrders();
+            if (apiOrders && apiOrders.length > 0) {
+              setOrders(apiOrders);
+              // Backup to localStorage
+              ExcelService.saveOrdersToLocalStorage(apiOrders);
+              console.log('✅ Orders loaded from API');
+              setIsLoading(false);
+              return;
+            }
+          } catch (apiError) {
+            console.log('API not available, falling back to localStorage:', apiError);
+          }
+        }
+        
         // Try to load from localStorage backup
         const localOrders = ExcelService.loadOrdersFromLocalStorage();
         if (localOrders.length > 0) {
           setOrders(localOrders);
+          console.log('✅ Orders loaded from localStorage');
         } else {
           // Fallback to mock data
           setOrders(mockOrders);
           // Save mock data to localStorage as backup
           ExcelService.saveOrdersToLocalStorage(mockOrders);
+          console.log('✅ Orders loaded from mock data');
         }
       } catch (error) {
         console.error('Error loading initial data:', error);
@@ -56,19 +77,22 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
     };
 
     loadInitialData();
-  }, []);
+  }, [user]);
 
   const getOrderById = (orderId: string): Order | undefined => {
     return orders.find(order => order.orderId === orderId);
   };
 
-  const createOrder = (orderData: Partial<Order>): Order => {
+  const createOrder = async (orderData: Partial<Order>): Promise<Order> => {
     if (!user) {
       throw new Error('User must be authenticated to create orders');
     }
 
+    // Generate sequential order ID in format YYYY-X
+    const generatedOrderId = generateOrderId(orders);
+
     const newOrder: Order = {
-      orderId: orderData.orderId || `ORD-${Date.now()}`,
+      orderId: orderData.orderId || generatedOrderId,
       createdAt: new Date().toISOString(),
       createdBy: orderData.createdBy || {
         userId: user.userId,
@@ -115,15 +139,32 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
       notes: orderData.notes
     };
 
-    // Add the new order to the orders list
-    setOrders(prevOrders => {
-      const updatedOrders = [newOrder, ...prevOrders];
-      // Save to localStorage backup
-      ExcelService.saveOrdersToLocalStorage(updatedOrders);
-      return updatedOrders;
-    });
+    try {
+      // Try to create order via API
+      const createdOrder = await ordersAPI.createOrder(newOrder);
+      
+      // Add the new order to the orders list
+      setOrders(prevOrders => {
+        const updatedOrders = [createdOrder, ...prevOrders];
+        // Save to localStorage backup
+        ExcelService.saveOrdersToLocalStorage(updatedOrders);
+        return updatedOrders;
+      });
 
-    return newOrder;
+      return createdOrder;
+    } catch (error) {
+      console.log('API create order failed, using local storage:', error);
+      
+      // Fallback to local storage
+      setOrders(prevOrders => {
+        const updatedOrders = [newOrder, ...prevOrders];
+        // Save to localStorage backup
+        ExcelService.saveOrdersToLocalStorage(updatedOrders);
+        return updatedOrders;
+      });
+
+      return newOrder;
+    }
   };
 
   const updateOrderStatus = (orderId: string, newStatus: string, note?: string) => {
@@ -350,6 +391,7 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
       },
       fileSize: documentData.length,
       mimeType: 'application/pdf',
+      data: documentData, // Store the actual document data (base64)
     };
 
     setOrders(prevOrders => {

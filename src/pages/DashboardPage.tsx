@@ -47,6 +47,7 @@ import {
 import AppBanner from '../components/AppBanner';
 import CreateOrderModal from '../components/CreateOrderModal';
 import { PDFExtractorService } from '../services/pdfExtractorService';
+import { GeminiPDFExtractorService } from '../services/geminiPdfExtractor';
 import toast from 'react-hot-toast';
 
 const DashboardPage: React.FC = () => {
@@ -56,6 +57,16 @@ const DashboardPage: React.FC = () => {
   const [createOrderOpen, setCreateOrderOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({});
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Helper function to convert file to base64
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
 
   const toggleSection = (status: string) => {
     setExpandedSections(prev => ({
@@ -154,23 +165,55 @@ const DashboardPage: React.FC = () => {
     )
   );
 
-  const handleCreateOrder = (orderData: any) => {
+  const handleCreateOrder = async (orderData: any) => {
     console.log('Creating order:', orderData);
     console.log('PDF file:', orderData.pdfFile);
     console.log('Extracted data:', orderData.extractedData);
     
+    // Convert PDF file to base64 if it exists
+    let pdfFileData: string | null = null;
+    if (orderData.pdfFile) {
+      pdfFileData = await convertFileToBase64(orderData.pdfFile);
+      console.log('PDF file converted to base64');
+    }
+    
     try {
-      // Check if we have PDF extraction result
-      const extractedData = orderData.extractedData;
-      const isPDFExtraction = extractedData && extractedData.data && extractedData.data.PO_NUMBER;
+      // Check if we have Gemini extraction result
+      const geminiData = orderData.geminiData;
+      const hasGeminiData = geminiData && geminiData.customerName && geminiData.items && geminiData.items.length > 0;
       
-      if (isPDFExtraction) {
-        // Handle PDF extraction result using the PDF extraction service
-        const pdfExtractor = PDFExtractorService.getInstance();
-        const newOrder = pdfExtractor.convertExtractedDataToOrder(extractedData, user?.userId || 'system', orderData.supplier);
+      // Check if we have Python extraction result
+      const extractedData = orderData.extractedData;
+      const isPythonExtraction = extractedData && extractedData.data && extractedData.data.PO_NUMBER;
+      
+      if (hasGeminiData) {
+        // Handle Gemini AI extraction result
+        console.log('Using Gemini AI extracted data');
+        const geminiExtractor = GeminiPDFExtractorService.getInstance();
+        const newOrder = geminiExtractor.convertGeminiDataToOrder(geminiData, user?.userId || 'system', orderData.supplier, pdfFileData || undefined);
         
         // Create the order using the converted data
-        const createdOrder = createOrder(newOrder);
+        const createdOrder = await createOrder(newOrder);
+        
+        console.log('Created order with Gemini extracted data:', createdOrder);
+        
+        // Redirect to the order detail page
+        navigate(`/order/${createdOrder.orderId}?created=true`);
+        
+        // Close the modal
+        setCreateOrderOpen(false);
+        
+        // Show success message
+        toast.success(`✨ Order ${createdOrder.orderId} created successfully with Gemini AI!`);
+        
+      } else if (isPythonExtraction) {
+        // Handle Python PDF extraction result
+        console.log('Using Python extracted data');
+        const pdfExtractor = PDFExtractorService.getInstance();
+        const newOrder = pdfExtractor.convertExtractedDataToOrder(extractedData, user?.userId || 'system', orderData.supplier, pdfFileData || undefined);
+        
+        // Create the order using the converted data
+        const createdOrder = await createOrder(newOrder);
         
         console.log('Created order with extracted customer data:', createdOrder);
         
@@ -186,7 +229,7 @@ const DashboardPage: React.FC = () => {
       } else {
         // No PDF extraction result available, but still create order with uploaded PDF if available
         if (orderData.pdfFile) {
-          const newOrder = createOrder({
+          const newOrder = await createOrder({
             // Customer information (default)
             customer: {
               name: 'Pharmaceutical Customer',
@@ -247,7 +290,8 @@ const DashboardPage: React.FC = () => {
                   name: user?.name || 'Current User'
                 },
                 fileSize: orderData.pdfFile.size,
-                mimeType: 'application/pdf'
+                mimeType: 'application/pdf',
+                data: pdfFileData || undefined, // Add the base64 data
               }
             },
         timeline: [{

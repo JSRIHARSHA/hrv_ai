@@ -1,0 +1,5 @@
+
+{
+  "name": "AI Purchase Order Extractor",
+  "description": "Upload a Purchase Order (PO) PDF file and this application will use AI to read and extract essential fields like PO number, vendor details, line items, and totals into a structured format."
+}

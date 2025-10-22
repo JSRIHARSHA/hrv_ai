@@ -22,6 +22,8 @@ import {
 import { ContactInfo } from '../types';
 import { Supplier, searchSuppliers } from '../data/suppliers';
 import { PDFExtractorService, PDFExtractionResult } from '../services/pdfExtractorService';
+import { GeminiPDFExtractorService } from '../services/geminiPdfExtractor';
+import type { PurchaseOrder } from '../types';
 import { useDropzone } from 'react-dropzone';
 import toast from 'react-hot-toast';
 
@@ -35,10 +37,12 @@ interface CreateOrderData {
   pdfFile: File | null;
   supplier: ContactInfo;
   extractedData?: PDFExtractionResult;
+  geminiData?: PurchaseOrder;
 }
 
 const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ open, onClose, onSubmit }) => {
   const pdfExtractor = PDFExtractorService.getInstance();
+  const geminiExtractor = GeminiPDFExtractorService.getInstance();
   
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [supplier, setSupplier] = useState<ContactInfo | null>(null);
@@ -46,7 +50,9 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ open, onClose, onSu
   const [supplierOptions, setSupplierOptions] = useState<Supplier[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pdfExtractionResult, setPdfExtractionResult] = useState<PDFExtractionResult | null>(null);
+  const [geminiExtractionResult, setGeminiExtractionResult] = useState<PurchaseOrder | null>(null);
   const [isExtractingPDF, setIsExtractingPDF] = useState(false);
+  const [useGemini, setUseGemini] = useState(true); // Default to using Gemini
 
   useEffect(() => {
     if (supplierSearch.trim()) {
@@ -116,27 +122,49 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ open, onClose, onSu
     try {
       setIsExtractingPDF(true);
       
-      // Extract data using the Python PDF extractor
-      const result = await pdfExtractor.extractFromPDF(pdfFile);
-      setPdfExtractionResult(result);
-      
-      if (result.success) {
-        toast.success('PDF data extracted successfully!');
+      // Try Gemini AI extraction first
+      try {
+        console.log('🤖 Using Gemini AI for PDF extraction...');
+        toast.loading('Extracting data with Gemini AI...', { id: 'gemini-extraction' });
         
-        // Auto-populate supplier if extracted
-        if (result.data.PO_ISSUER_NAME) {
-          const extractedSupplier: ContactInfo = {
-            name: result.data.PO_ISSUER_NAME,
-            address: result.data.PO_ISSUER_ADDRESS || '',
-            country: 'India',
-            email: 'supplier@example.com',
-            phone: result.data.CONTACT_NUMBER || '',
-            gstin: result.data.GSTIN || undefined
-          };
-          setSupplier(extractedSupplier);
+        const geminiResult = await geminiExtractor.extractFromPDF(pdfFile);
+        setGeminiExtractionResult(geminiResult);
+        
+        toast.success('✨ PDF data extracted successfully with Gemini AI!', { id: 'gemini-extraction' });
+        
+        // Auto-populate supplier if customer name is extracted
+        if (geminiResult.customerName) {
+          // Note: In Gemini extraction, customer is the one issuing the PO
+          // So we might need to adjust this logic based on your business flow
+          console.log('Gemini extracted customer:', geminiResult.customerName);
         }
-      } else {
-        toast.error('Failed to extract data from PDF');
+        
+      } catch (geminiError: any) {
+        console.log('⚠️  Gemini extraction failed, falling back to Python extractor:', geminiError);
+        toast.error('Gemini AI not configured. Falling back to Python extractor...', { id: 'gemini-extraction' });
+        
+        // Fallback to Python PDF extractor
+        const result = await pdfExtractor.extractFromPDF(pdfFile);
+        setPdfExtractionResult(result);
+        
+        if (result.success) {
+          toast.success('PDF data extracted successfully with Python extractor!');
+          
+          // Auto-populate supplier if extracted
+          if (result.data.PO_ISSUER_NAME) {
+            const extractedSupplier: ContactInfo = {
+              name: result.data.PO_ISSUER_NAME,
+              address: result.data.PO_ISSUER_ADDRESS || '',
+              country: 'India',
+              email: 'supplier@example.com',
+              phone: result.data.CONTACT_NUMBER || '',
+              gstin: result.data.GSTIN || undefined
+            };
+            setSupplier(extractedSupplier);
+          }
+        } else {
+          toast.error('Failed to extract data from PDF');
+        }
       }
     } catch (error) {
       console.error('PDF extraction error:', error);
@@ -158,18 +186,28 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ open, onClose, onSu
 
     setIsSubmitting(true);
     try {
-      // Use PDF extraction result if available
-      if (pdfExtractionResult && pdfExtractionResult.success) {
-        // Use PDF extraction result
+      // Use Gemini extraction result if available
+      if (geminiExtractionResult) {
+        onSubmit({
+          pdfFile,
+          supplier,
+          geminiData: geminiExtractionResult,
+        });
+        toast.success('✨ Order created successfully with Gemini AI extraction!', { id: 'ai-processing' });
+        onClose();
+      } 
+      // Fallback to Python extraction result if available
+      else if (pdfExtractionResult && pdfExtractionResult.success) {
         onSubmit({
           pdfFile,
           supplier,
           extractedData: pdfExtractionResult,
         });
-        toast.success('Order created successfully with extracted PDF data!', { id: 'ai-processing' });
+        toast.success('Order created successfully with Python extraction!', { id: 'ai-processing' });
         onClose();
-      } else {
-        // No PDF extraction result available
+      } 
+      // No extraction result available
+      else {
         toast.error('Please wait for PDF extraction to complete or try uploading a different PDF');
       }
     } catch (error) {

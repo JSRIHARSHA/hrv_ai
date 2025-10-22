@@ -26,6 +26,9 @@ import {
   ListItemIcon,
   Alert,
   CircularProgress,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -39,11 +42,12 @@ import {
   Search,
   Clear,
   CloudUpload,
+  ExpandMore,
 } from '@mui/icons-material';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useOrders } from '../contexts/OrderContext';
-import { Order, FreightHandler } from '../types';
+import { Order, FreightHandler, Documents } from '../types';
 import { 
   statusDisplayNames
 } from '../data/constants';
@@ -84,14 +88,37 @@ const OrderDetailPage: React.FC = () => {
   // PDF generation state
   const [generatedPDF, setGeneratedPDF] = useState<string | null>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [taxRateDialogOpen, setTaxRateDialogOpen] = useState(false);
+  const [selectedTaxRate, setSelectedTaxRate] = useState<number>(0.1);
+  
+  // Document viewing state
+  const [viewingDocument, setViewingDocument] = useState<{ name: string; data: string } | null>(null);
   
   // Freight handler state
   const [freightHandlerSearch, setFreightHandlerSearch] = useState('');
   const [filteredFreightHandlers, setFilteredFreightHandlers] = useState<FreightHandler[]>([]);
   const [showFreightHandlerDropdown, setShowFreightHandlerDropdown] = useState(false);
   
+  // Accordion state for collapsible sections
+  const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({
+    orderSummary: true,
+    customerInformation: true,
+    supplierInformation: true,
+    freightHandlerInformation: false,
+    documents: true,
+    advancePaymentDetails: false,
+  });
+  
   // Build status options from constants
   const statusOptions = statusDisplayNames;
+
+  // Handle accordion expansion
+  const handleAccordionChange = (section: string) => (event: React.SyntheticEvent, isExpanded: boolean) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: isExpanded
+    }));
+  };
 
   useEffect(() => {
     if (orderId) {
@@ -158,6 +185,126 @@ const OrderDetailPage: React.FC = () => {
     navigate(`/order/${orderId}`, { replace: true });
   };
 
+  const handleSendCOAToCustomer = () => {
+    if (!editableOrder) return;
+
+    console.log('Current order:', editableOrder.orderId);
+    console.log('Order documents:', editableOrder.documents);
+    
+    // Check if COA document exists
+    let coaDocument = editableOrder.documents.coaPreShipment;
+    console.log('COA document:', coaDocument);
+    
+    // If no COA document exists, create a sample one for testing
+    if (!coaDocument) {
+      console.log('No COA document found, creating sample document for testing...');
+      coaDocument = {
+        id: 'sample_coa_doc',
+        filename: 'sample_coa_document.pdf',
+        uploadedAt: new Date().toISOString(),
+        uploadedBy: {
+          userId: 'user1',
+          name: 'System',
+        },
+        fileSize: 50000,
+        mimeType: 'application/pdf',
+        data: 'data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMiAwIFIKPj4KZW5kb2JqCjIgMCBvYmoKPDwKL1R5cGUgL1BhZ2VzCi9LaWRzIFszIDAgUl0KL0NvdW50IDEKL01lZGlhQm94IFswIDAgNTk1IDg0Ml0KPj4KZW5kb2JqCjMgMCBvYmoKPDwKL1R5cGUgL1BhZ2UKL1BhcmVudCAyIDAgUgovUmVzb3VyY2VzIDw8Ci9Gb250IDw8Ci9GMSAKPDwKL1R5cGUgL0ZvbnQKL1N1YnR5cGUgL1R5cGUxCi9CYXNlRm9udCAvSGVsdmV0aWNhCj4+Cj4+Cj4+Ci9Db250ZW50cyA0IDAgUgo+PgplbmRvYmoKNCAwIG9iago8PAovTGVuZ3RoIDQ0Cj4+CnN0cmVhbQpCVAoxMiAwIFRmCjcyIDcwMCAgVGQKKFRlc3QgQ09BIGRvY3VtZW50IGZvciB0ZXN0aW5nKSBUagoKRVQKZW5kc3RyZWFtCmVuZG9iagp4cmVmCjAgNQowMDAwMDAwMDAwIDY1NTM1IGYKMDAwMDAwMDAwOSAwMDAwMCBuCjAwMDAwMDAwNTggMDAwMDAgbgowMDAwMDAwMTE1IDAwMDAwIG4KMDAwMDAwMDI2NSAwMDAwMCBuCnRyYWlsZXIKPDwKL1NpemUgNQovUm9vdCAxIDAgUgo+PgpzdGFydHhyZWYKMzU2CiUlRU9G'
+      };
+      toast.success('Using sample COA document for testing. Please upload a real COA document for production use.');
+    }
+
+    try {
+      // Download the COA document first
+      if (coaDocument.data) {
+        console.log('Downloading COA document...');
+        const downloadLink = document.createElement('a');
+        downloadLink.href = coaDocument.data;
+        downloadLink.download = coaDocument.filename;
+        downloadLink.style.display = 'none';
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        console.log('COA document downloaded successfully');
+      }
+
+      // Create email subject and body
+      const subject = `COA Document - Order ${editableOrder.orderId}`;
+      const body = `Dear ${editableOrder.customer.name},
+
+Please find attached the Certificate of Analysis (COA) document for your order ${editableOrder.orderId}.
+
+Order Details:
+- Material: ${editableOrder.materialName}
+- Quantity: ${editableOrder.quantity.value} ${editableOrder.quantity.unit}
+- Order ID: ${editableOrder.orderId}
+- COA Document: ${coaDocument.filename}
+
+Please review the attached COA document and let us know if you have any questions.
+
+Best regards,
+${editableOrder.assignedTo?.name || 'Order Management Team'}`;
+
+      // Create mailto link (works with default email client)
+      const mailtoLink = `mailto:${editableOrder.customer.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      
+      // Open email client with instructions
+      setTimeout(() => {
+        try {
+          window.location.href = mailtoLink;
+          
+          // Update the order status
+          handleFieldChange('status', 'COA_Accepted');
+          
+          // Add timeline event
+          addTimelineEvent(
+            editableOrder.orderId,
+            'COA Email Prepared',
+            `Email prepared for customer with COA document: ${coaDocument?.filename || 'Unknown'}`,
+            'COA_Accepted'
+          );
+          
+          toast.success(`COA document downloaded. Email opened. Please manually attach "${coaDocument?.filename || 'the COA file'}" from your Downloads folder before sending.`, {
+            duration: 6000,
+          });
+        } catch (error) {
+          console.error('Error opening email client:', error);
+          // Copy to clipboard as fallback
+          const emailContent = `To: ${editableOrder.customer.email}\nSubject: ${subject}\n\n${body}`;
+          navigator.clipboard.writeText(emailContent);
+          toast.success('Email content copied to clipboard. Please paste into your email client and attach the downloaded file.');
+        }
+      }, 500); // Small delay to ensure download completes first
+      
+    } catch (error) {
+      console.error('Error preparing COA email:', error);
+      toast.error('Error preparing COA email. Please try again.');
+    }
+  };
+
+  const handleFileUpload = async (file: File, documentType: 'customerPO' | 'supplierPO' | 'quotation' | 'proformaInvoice' | 'coaPreShipment') => {
+    if (!editableOrder || !file) return;
+
+    try {
+      // Convert file to base64 data URL for storage
+      const reader = new FileReader();
+      reader.onload = () => {
+        const fileData = reader.result as string;
+        
+        // Attach the document to the order
+        attachDocument(editableOrder.orderId, documentType, fileData, file.name);
+        
+        toast.success(`${file.name} uploaded successfully`);
+      };
+      reader.onerror = () => {
+        toast.error('Error reading file');
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('File upload error:', error);
+      toast.error('Error uploading file');
+    }
+  };
+
   const handleAddComment = () => {
     if (newComment.trim() && order) {
       addComment(order.orderId, newComment.trim());
@@ -176,22 +323,29 @@ const OrderDetailPage: React.FC = () => {
     }
   };
 
-  const handleGeneratePO = async () => {
+  const handleGeneratePO = () => {
+    if (!editableOrder) return;
+    // Open tax rate selection dialog
+    setTaxRateDialogOpen(true);
+  };
+
+  const handleGeneratePOWithTax = async (taxRate: number) => {
     if (!editableOrder) return;
     
+    setTaxRateDialogOpen(false);
     setIsGeneratingPDF(true);
     try {
-      // Generate PDF based on entity
+      // Generate PDF based on entity with selected tax rate
       const entity = editableOrder.entity || 'HRV';
       let pdfDataURL: string;
       
       if (entity === 'HRV') {
         // Use pdf-lib generator that replicates the Python code
         const templateUrl = getTemplateUrl();
-        pdfDataURL = await previewHRVPOFromOrder(templateUrl, editableOrder);
+        pdfDataURL = await previewHRVPOFromOrder(templateUrl, editableOrder, taxRate);
       } else {
         // Use NHG pdf-lib generator
-        pdfDataURL = await previewNHGPOFromOrder(editableOrder);
+        pdfDataURL = await previewNHGPOFromOrder(editableOrder, taxRate);
       }
       
       setGeneratedPDF(pdfDataURL);
@@ -200,11 +354,11 @@ const OrderDetailPage: React.FC = () => {
       addTimelineEvent(
         editableOrder.orderId,
         'Supplier PO Generated',
-        `Supplier PO generated for ${entity} entity`,
+        `Supplier PO generated for ${entity} entity with ${taxRate}% tax`,
         'PO_Sent_to_Supplier'
       );
       
-      toast.success(`Supplier PO generated successfully for ${entity}`);
+      toast.success(`Supplier PO generated successfully for ${entity} with ${taxRate}% tax`);
     } catch (error) {
       toast.error('Error generating Supplier PO');
       console.error('PDF generation error:', error);
@@ -432,17 +586,34 @@ const OrderDetailPage: React.FC = () => {
           {/* Main Content */}
           <Grid item xs={12} md={8}>
             {/* Order Summary */}
-            <Paper sx={{ 
-              p: 3, 
+            <Accordion 
+              expanded={expandedSections.orderSummary}
+              onChange={handleAccordionChange('orderSummary')}
+              sx={{
               mb: 3, 
               bgcolor: 'rgba(255,255,255,0.05)', 
               border: '1px solid rgba(255,255,255,0.1)',
               borderRadius: 2,
-            }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                '&:before': { display: 'none' },
+                '&.Mui-expanded': {
+                  bgcolor: 'rgba(255,255,255,0.08)',
+                },
+              }}
+            >
+              <AccordionSummary
+                expandIcon={<ExpandMore sx={{ color: '#FFFFFF' }} />}
+                sx={{
+                  '& .MuiAccordionSummary-content': {
+                    alignItems: 'center',
+                  },
+                }}
+              >
                 <Typography variant="h5" sx={{ color: '#FFFFFF', fontWeight: 600 }}>
                   Order Summary
                 </Typography>
+              </AccordionSummary>
+              <AccordionDetails sx={{ pt: 0 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                 <Box sx={{ display: 'flex', gap: 2 }}>
                   <FormControl size="small" sx={{ minWidth: 120 }}>
                     <InputLabel sx={{ color: '#FFFFFF' }}>Entity</InputLabel>
@@ -483,6 +654,66 @@ const OrderDetailPage: React.FC = () => {
                       ))}
                     </Select>
                   </FormControl>
+                  
+                  {/* Workflow Action Buttons */}
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {/* Generate Supplier PO Button */}
+                    {editableOrder?.status === 'Drafting_PO_for_Supplier' && (
+                      <Button
+                        variant="contained"
+                        startIcon={<AttachFile />}
+                        onClick={handleGeneratePO}
+                        disabled={isGeneratingPDF}
+                        sx={{
+                          bgcolor: '#7C4DFF',
+                          fontSize: '0.75rem',
+                          px: 2,
+                          py: 0.5,
+                          '&:hover': { 
+                            bgcolor: '#6A3DD8',
+                          },
+                        }}
+                      >
+                        {isGeneratingPDF ? 'Generating...' : 'Generate PO for Supplier'}
+                      </Button>
+                    )}
+                    
+                    {/* Send COA to Customer Button */}
+                    {editableOrder?.status === 'COA_Received' && (
+                      <Button
+                        variant="contained"
+                        onClick={handleSendCOAToCustomer}
+                        sx={{
+                          backgroundColor: '#FF9800',
+                          color: '#FFFFFF',
+                          fontSize: '0.75rem',
+                          px: 2,
+                          py: 0.5,
+                          '&:hover': { backgroundColor: '#F57C00' },
+                        }}
+                      >
+                        Send COA to Customer
+                      </Button>
+                    )}
+                    
+                    {/* Send for Approval Button */}
+                    {editableOrder?.status === 'COA_Accepted' && (
+                      <Button
+                        variant="contained"
+                        onClick={() => handleFieldChange('status', 'Awaiting_Approval')}
+                        sx={{
+                          backgroundColor: '#9C27B0',
+                          color: '#FFFFFF',
+                          fontSize: '0.75rem',
+                          px: 2,
+                          py: 0.5,
+                          '&:hover': { backgroundColor: '#8E24AA' },
+                        }}
+                      >
+                        Send for Approval
+                      </Button>
+                    )}
+                  </Box>
                 </Box>
               </Box>
               
@@ -1003,79 +1234,38 @@ const OrderDetailPage: React.FC = () => {
                 </Grid>
               </Grid>
               
-              {/* Workflow Actions */}
-              <Box sx={{ mt: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                {/* Send PO to Supplier Button */}
-                {editableOrder?.supplierPOGenerated && !editableOrder?.supplierPOSent && (
-                  <Button
-                    variant="contained"
-                    onClick={() => {
-                      handleFieldChange('supplierPOSent', true);
-                      handleFieldChange('status', 'PO_Sent_to_Supplier');
-                    }}
-                    sx={{
-                      backgroundColor: '#4CAF50',
-                      color: '#FFFFFF',
-                      '&:hover': { backgroundColor: '#45A049' },
-                      fontSize: '0.875rem',
-                      px: 3,
-                      py: 1,
-                    }}
-                  >
-                    Send PO to Supplier
-                  </Button>
-                )}
-                
-                {/* Send COA to Customer Button */}
-                {editableOrder?.status === 'COA_Received' && (
-                  <Button
-                    variant="contained"
-                    onClick={() => handleFieldChange('status', 'COA_Accepted')}
-                    sx={{
-                      backgroundColor: '#FF9800',
-                      color: '#FFFFFF',
-                      '&:hover': { backgroundColor: '#F57C00' },
-                      fontSize: '0.875rem',
-                      px: 3,
-                      py: 1,
-                    }}
-                  >
-                    Send COA to Customer
-                  </Button>
-                )}
-                
-                {/* Send for Approval Button */}
-                {editableOrder?.status === 'COA_Accepted' && (
-                  <Button
-                    variant="contained"
-                    onClick={() => handleFieldChange('status', 'Awaiting_Approval')}
-                    sx={{
-                      backgroundColor: '#9C27B0',
-                      color: '#FFFFFF',
-                      '&:hover': { backgroundColor: '#8E24AA' },
-                      fontSize: '0.875rem',
-                      px: 3,
-                      py: 1,
-                    }}
-                  >
-                    Send for Approval
-                  </Button>
-                )}
-              </Box>
-            </Paper>
+              </AccordionDetails>
+            </Accordion>
 
             {/* Customer & Supplier Information */}
             <Grid container spacing={3} sx={{ mb: 3 }}>
               <Grid item xs={12} md={6}>
-                <Paper sx={{ 
-                  p: 3, 
+                <Accordion 
+                  expanded={expandedSections.customerInformation}
+                  onChange={handleAccordionChange('customerInformation')}
+                  sx={{
                   bgcolor: 'rgba(255,255,255,0.05)', 
                   border: '1px solid rgba(255,255,255,0.1)',
                   borderRadius: 2,
-                }}>
-                  <Typography variant="h6" sx={{ color: '#FFFFFF', fontWeight: 600, mb: 2 }}>
+                    '&:before': { display: 'none' },
+                    '&.Mui-expanded': {
+                      bgcolor: 'rgba(255,255,255,0.08)',
+                    },
+                  }}
+                >
+                  <AccordionSummary
+                    expandIcon={<ExpandMore sx={{ color: '#FFFFFF' }} />}
+                    sx={{
+                      '& .MuiAccordionSummary-content': {
+                        alignItems: 'center',
+                      },
+                    }}
+                  >
+                    <Typography variant="h6" sx={{ color: '#FFFFFF', fontWeight: 600 }}>
                     Customer Information
                   </Typography>
+                  </AccordionSummary>
+                  <AccordionDetails sx={{ pt: 0 }}>
                   <TextField
                     label="Company Name"
                     value={editableOrder?.customer.name || ''}
@@ -1195,19 +1385,37 @@ const OrderDetailPage: React.FC = () => {
                       '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
                     }}
                   />
-                </Paper>
+                  </AccordionDetails>
+                </Accordion>
               </Grid>
               
               <Grid item xs={12} md={6}>
-                <Paper sx={{ 
-                  p: 3, 
+                <Accordion 
+                  expanded={expandedSections.supplierInformation}
+                  onChange={handleAccordionChange('supplierInformation')}
+                  sx={{
                   bgcolor: 'rgba(255,255,255,0.05)', 
                   border: '1px solid rgba(255,255,255,0.1)',
                   borderRadius: 2,
-                }}>
-                  <Typography variant="h6" sx={{ color: '#FFFFFF', fontWeight: 600, mb: 2 }}>
+                    '&:before': { display: 'none' },
+                    '&.Mui-expanded': {
+                      bgcolor: 'rgba(255,255,255,0.08)',
+                    },
+                  }}
+                >
+                  <AccordionSummary
+                    expandIcon={<ExpandMore sx={{ color: '#FFFFFF' }} />}
+                    sx={{
+                      '& .MuiAccordionSummary-content': {
+                        alignItems: 'center',
+                      },
+                    }}
+                  >
+                    <Typography variant="h6" sx={{ color: '#FFFFFF', fontWeight: 600 }}>
                     Supplier Information
                   </Typography>
+                  </AccordionSummary>
+                  <AccordionDetails sx={{ pt: 0 }}>
                   <TextField
                     label="Company Name"
                     value={editableOrder?.supplier.name || ''}
@@ -1327,21 +1535,39 @@ const OrderDetailPage: React.FC = () => {
                       '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
                     }}
                   />
-                </Paper>
+                  </AccordionDetails>
+                </Accordion>
               </Grid>
             </Grid>
 
             {/* Freight Handler Information */}
-            <Paper sx={{ 
-              p: 3, 
+            <Accordion 
+              expanded={expandedSections.freightHandlerInformation}
+              onChange={handleAccordionChange('freightHandlerInformation')}
+              sx={{
               mb: 3, 
               bgcolor: 'rgba(255,255,255,0.05)', 
               border: '1px solid rgba(255,255,255,0.1)',
               borderRadius: 2,
-            }}>
-              <Typography variant="h6" sx={{ color: '#FFFFFF', fontWeight: 600, mb: 2 }}>
+                '&:before': { display: 'none' },
+                '&.Mui-expanded': {
+                  bgcolor: 'rgba(255,255,255,0.08)',
+                },
+              }}
+            >
+              <AccordionSummary
+                expandIcon={<ExpandMore sx={{ color: '#FFFFFF' }} />}
+                sx={{
+                  '& .MuiAccordionSummary-content': {
+                    alignItems: 'center',
+                  },
+                }}
+              >
+                <Typography variant="h6" sx={{ color: '#FFFFFF', fontWeight: 600 }}>
                 Freight Handler Information
               </Typography>
+              </AccordionSummary>
+              <AccordionDetails sx={{ pt: 0 }}>
               
               {/* Freight Handler Search */}
               <Box sx={{ position: 'relative', mb: 3 }} data-freight-handler-dropdown>
@@ -1693,19 +1919,37 @@ const OrderDetailPage: React.FC = () => {
                   </Grid>
                 </Grid>
               )}
-            </Paper>
+              </AccordionDetails>
+            </Accordion>
 
             {/* Documents */}
-            <Paper sx={{ 
-              p: 3, 
+            <Accordion 
+              expanded={expandedSections.documents}
+              onChange={handleAccordionChange('documents')}
+              sx={{
               mb: 3, 
               bgcolor: 'rgba(255,255,255,0.05)', 
               border: '1px solid rgba(255,255,255,0.1)',
               borderRadius: 2,
-            }}>
-              <Typography variant="h6" sx={{ color: '#FFFFFF', fontWeight: 600, mb: 2 }}>
+                '&:before': { display: 'none' },
+                '&.Mui-expanded': {
+                  bgcolor: 'rgba(255,255,255,0.08)',
+                },
+              }}
+            >
+              <AccordionSummary
+                expandIcon={<ExpandMore sx={{ color: '#FFFFFF' }} />}
+                sx={{
+                  '& .MuiAccordionSummary-content': {
+                    alignItems: 'center',
+                  },
+                }}
+              >
+                <Typography variant="h6" sx={{ color: '#FFFFFF', fontWeight: 600 }}>
                 Documents
               </Typography>
+              </AccordionSummary>
+              <AccordionDetails sx={{ pt: 0 }}>
               
               {/* Generated Supplier PO */}
               {generatedPDF && (
@@ -1809,6 +2053,13 @@ const OrderDetailPage: React.FC = () => {
                             <Button 
                               size="small" 
                               startIcon={<Visibility />}
+                              onClick={() => {
+                                if (doc.data) {
+                                  setViewingDocument({ name: doc.filename, data: doc.data });
+                                } else {
+                                  toast.error('Document preview not available. Document data is missing.');
+                                }
+                              }}
                               sx={{ 
                                 color: '#7C4DFF',
                                 '&:hover': { bgcolor: 'rgba(124, 77, 255, 0.1)' }
@@ -1819,6 +2070,20 @@ const OrderDetailPage: React.FC = () => {
                             <Button 
                               size="small" 
                               startIcon={<Download />}
+                              onClick={() => {
+                                if (doc.data) {
+                                  const downloadLink = document.createElement('a');
+                                  downloadLink.href = doc.data;
+                                  downloadLink.download = doc.filename;
+                                  downloadLink.style.display = 'none';
+                                  document.body.appendChild(downloadLink);
+                                  downloadLink.click();
+                                  document.body.removeChild(downloadLink);
+                                  toast.success(`${doc.filename} downloaded successfully`);
+                                } else {
+                                  toast.error('Document data not available for download');
+                                }
+                              }}
                               sx={{ 
                                 color: '#7C4DFF',
                                 '&:hover': { bgcolor: 'rgba(124, 77, 255, 0.1)' }
@@ -1836,28 +2101,6 @@ const OrderDetailPage: React.FC = () => {
               
               {/* Conditional Document Uploads */}
               <Box sx={{ mt: 3 }}>
-                {/* Generate Supplier PO Button */}
-                {editableOrder?.status === 'Drafting_PO_for_Supplier' && (
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="subtitle1" sx={{ color: '#FFFFFF', mb: 1 }}>
-                      Supplier PO Generation
-                    </Typography>
-                    <Button
-                      variant="contained"
-                      startIcon={<AttachFile />}
-                      onClick={handleGeneratePO}
-                      disabled={isGeneratingPDF}
-                      sx={{
-                        bgcolor: '#7C4DFF',
-                        '&:hover': { 
-                          bgcolor: '#6A3DD8',
-                        },
-                      }}
-                    >
-                      {isGeneratingPDF ? 'Generating...' : 'Generate Supplier PO'}
-                    </Button>
-                  </Box>
-                )}
                 
                 {/* Proforma Invoice Upload */}
                 {editableOrder?.status === 'PO_Sent_to_Supplier' && (
@@ -1886,8 +2129,7 @@ const OrderDetailPage: React.FC = () => {
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (file) {
-                            // Handle file upload logic here
-                            console.log('Proforma Invoice uploaded:', file.name);
+                            handleFileUpload(file, 'proformaInvoice');
                           }
                         }}
                       />
@@ -1922,8 +2164,7 @@ const OrderDetailPage: React.FC = () => {
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (file) {
-                            // Handle file upload logic here
-                            console.log('COA uploaded:', file.name);
+                            handleFileUpload(file, 'coaPreShipment');
                           }
                         }}
                       />
@@ -1958,8 +2199,7 @@ const OrderDetailPage: React.FC = () => {
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (file) {
-                            // Handle file upload logic here
-                            console.log('Revised COA uploaded:', file.name);
+                            handleFileUpload(file, 'coaPreShipment');
                           }
                         }}
                       />
@@ -1967,21 +2207,39 @@ const OrderDetailPage: React.FC = () => {
                   </Box>
                 )}
               </Box>
-            </Paper>
+              </AccordionDetails>
+            </Accordion>
 
 
             {/* Advance Payment (if applicable) */}
             {order.advancePayment && (
-              <Paper sx={{ 
-                p: 3, 
+              <Accordion 
+                expanded={expandedSections.advancePaymentDetails}
+                onChange={handleAccordionChange('advancePaymentDetails')}
+                sx={{
                 mb: 3, 
                 bgcolor: 'rgba(255,255,255,0.05)', 
                 border: '1px solid rgba(255,255,255,0.1)',
                 borderRadius: 2,
-              }}>
-                <Typography variant="h6" sx={{ color: '#FFFFFF', fontWeight: 600, mb: 2 }}>
-                  Advance Payment
+                  '&:before': { display: 'none' },
+                  '&.Mui-expanded': {
+                    bgcolor: 'rgba(255,255,255,0.08)',
+                  },
+                }}
+              >
+                <AccordionSummary
+                  expandIcon={<ExpandMore sx={{ color: '#FFFFFF' }} />}
+                  sx={{
+                    '& .MuiAccordionSummary-content': {
+                      alignItems: 'center',
+                    },
+                  }}
+                >
+                  <Typography variant="h6" sx={{ color: '#FFFFFF', fontWeight: 600 }}>
+                    Advance Payment Details
                 </Typography>
+                </AccordionSummary>
+                <AccordionDetails sx={{ pt: 0 }}>
                 <Grid container spacing={2}>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="subtitle2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
@@ -2016,7 +2274,8 @@ const OrderDetailPage: React.FC = () => {
                     </Typography>
                   </Grid>
                 </Grid>
-              </Paper>
+                </AccordionDetails>
+              </Accordion>
             )}
 
             {/* Payment Details (for approved orders and beyond) */}
@@ -2344,6 +2603,151 @@ const OrderDetailPage: React.FC = () => {
 
       {/* Status Change Dialog */}
       {/* Status change dialog removed; status is now inline dropdown */}
+
+      {/* Document Viewer Dialog */}
+      <Dialog 
+        open={viewingDocument !== null} 
+        onClose={() => setViewingDocument(null)} 
+        maxWidth="lg" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: 'rgba(15, 15, 35, 0.95)',
+            border: '1px solid rgba(124, 77, 255, 0.3)',
+          }
+        }}
+      >
+        <DialogTitle sx={{ color: '#FFFFFF', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6">
+              {viewingDocument?.name || 'Document Viewer'}
+            </Typography>
+            <Button
+              onClick={() => setViewingDocument(null)}
+              sx={{ color: 'rgba(255,255,255,0.7)' }}
+            >
+              Close
+            </Button>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0, minHeight: '70vh' }}>
+          {viewingDocument && viewingDocument.data && (
+            <iframe
+              src={viewingDocument.data}
+              width="100%"
+              height="700px"
+              style={{ border: 'none' }}
+              title={viewingDocument.name}
+            />
+          )}
+          {viewingDocument && !viewingDocument.data && (
+            <Box sx={{ p: 4, textAlign: 'center' }}>
+              <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                Document preview not available. The document data is missing.
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ borderTop: '1px solid rgba(255,255,255,0.1)', p: 2 }}>
+          {viewingDocument && viewingDocument.data && (
+            <Button
+              variant="contained"
+              startIcon={<Download />}
+              onClick={() => {
+                if (viewingDocument.data) {
+                  const downloadLink = document.createElement('a');
+                  downloadLink.href = viewingDocument.data;
+                  downloadLink.download = viewingDocument.name;
+                  downloadLink.style.display = 'none';
+                  document.body.appendChild(downloadLink);
+                  downloadLink.click();
+                  document.body.removeChild(downloadLink);
+                  toast.success(`${viewingDocument.name} downloaded successfully`);
+                }
+              }}
+              sx={{
+                bgcolor: '#7C4DFF',
+                '&:hover': { bgcolor: '#6B46C1' },
+              }}
+            >
+              Download
+            </Button>
+          )}
+          <Button 
+            onClick={() => setViewingDocument(null)}
+            sx={{ color: '#FFFFFF' }}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Tax Rate Selection Dialog */}
+      <Dialog
+        open={taxRateDialogOpen}
+        onClose={() => setTaxRateDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            background: 'linear-gradient(135deg, #1A1A2E 0%, #16213E 100%)',
+            border: '1px solid rgba(124, 77, 255, 0.3)',
+          }
+        }}
+      >
+        <DialogTitle sx={{ color: '#FFFFFF', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+          Select Tax Rate
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          <FormControl fullWidth sx={{ mt: 1 }}>
+            <InputLabel sx={{ color: '#FFFFFF' }}>Tax Rate</InputLabel>
+            <Select
+              value={selectedTaxRate}
+              onChange={(e) => setSelectedTaxRate(Number(e.target.value))}
+              label="Tax Rate"
+              sx={{
+                color: '#FFFFFF',
+                '.MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(124, 77, 255, 0.3)',
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(124, 77, 255, 0.5)',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#7C4DFF',
+                },
+                '.MuiSvgIcon-root': {
+                  color: '#FFFFFF',
+                },
+              }}
+            >
+              <MenuItem value={0}>Zero Tax (0%)</MenuItem>
+              <MenuItem value={0.1}>0.1%</MenuItem>
+              <MenuItem value={5}>5%</MenuItem>
+              <MenuItem value={18}>18%</MenuItem>
+              <MenuItem value={28}>28%</MenuItem>
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions sx={{ borderTop: '1px solid rgba(255,255,255,0.1)', p: 2 }}>
+          <Button
+            onClick={() => setTaxRateDialogOpen(false)}
+            sx={{ color: '#FFFFFF' }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => handleGeneratePOWithTax(selectedTaxRate)}
+            sx={{
+              bgcolor: '#7C4DFF',
+              '&:hover': { bgcolor: '#6B46C1' },
+            }}
+          >
+            Generate PO
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* AI PDF Generation Modal */}
       {order && (
