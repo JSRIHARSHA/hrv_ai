@@ -50,12 +50,15 @@ if (!sequelize) {
   const dbHost = process.env.POSTGRES_HOST || 'localhost';
   const dbPort = process.env.POSTGRES_PORT || 5432;
   
-  // Validate that password is set
+  // Validate that password is set (but don't exit in serverless)
   if (!dbPassword || dbPassword.trim() === '') {
     console.error('❌ POSTGRES_PASSWORD is not set in your .env file!');
     console.error('❌ Please set POSTGRES_PASSWORD in backend/.env');
     console.error('❌ Example: POSTGRES_PASSWORD=your_actual_password');
-    process.exit(1);
+    // Only exit in non-serverless environments
+    if (process.env.VERCEL !== '1' && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+      process.exit(1);
+    }
   }
   
   console.log(`📝 Using individual PostgreSQL variables:`);
@@ -117,10 +120,21 @@ const connectDB = async () => {
       await sequelize.sync({ alter: false }); // Set to true to alter tables, false to only create
       console.log('✅ Database models synchronized');
     }
+    
+    return true;
   } catch (error) {
     console.error('❌ PostgreSQL connection error:', error.message);
     console.error('Full error:', error);
-    process.exit(1);
+    
+    // Don't exit in serverless environment - let the function handle it
+    // Only exit in non-serverless environments
+    if (process.env.VERCEL !== '1' && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+      process.exit(1);
+    }
+    
+    // In serverless, return false so the app can still start
+    // The connection will be retried on first request
+    return false;
   }
 };
 

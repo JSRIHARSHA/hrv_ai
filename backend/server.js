@@ -15,8 +15,39 @@ const orderRoutes = require('./routes/orderRoutes');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Connect to PostgreSQL
-connectDB();
+// Connect to PostgreSQL (non-blocking for serverless)
+// In serverless environments, connection will be established on first request
+let dbConnected = false;
+connectDB().then(connected => {
+  dbConnected = connected;
+  if (connected) {
+    console.log('✅ Database connection established');
+  } else {
+    console.warn('⚠️  Database connection failed, will retry on first request');
+  }
+}).catch(err => {
+  console.error('❌ Database connection error:', err);
+  dbConnected = false;
+});
+
+// Health check endpoint that doesn't require DB
+app.get('/health', async (req, res) => {
+  const { sequelize } = require('./config/database');
+  let dbStatus = 'Disconnected';
+  try {
+    await sequelize.authenticate();
+    dbStatus = 'Connected';
+  } catch (error) {
+    dbStatus = 'Disconnected';
+  }
+  
+  res.json({ 
+    status: 'OK', 
+    message: 'Backend API is running',
+    timestamp: new Date().toISOString(),
+    database: dbStatus
+  });
+});
 
 // Middleware
 app.use(helmet());
@@ -79,24 +110,7 @@ const upload = multer({
   }
 });
 
-// Health check endpoint
-app.get('/health', async (req, res) => {
-  const { sequelize } = require('./config/database');
-  let dbStatus = 'Disconnected';
-  try {
-    await sequelize.authenticate();
-    dbStatus = 'Connected';
-  } catch (error) {
-    dbStatus = 'Disconnected';
-  }
-  
-  res.json({ 
-    status: 'OK', 
-    message: 'Backend API is running',
-    timestamp: new Date().toISOString(),
-    database: dbStatus
-  });
-});
+// Health check endpoint is defined above (moved before routes)
 
 // API Routes
 app.use('/api/auth', authRoutes);
