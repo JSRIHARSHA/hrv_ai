@@ -118,7 +118,22 @@ const upload = multer({
   }
 });
 
-// Health check endpoint is defined above (moved before routes)
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    message: 'HRV Order Management Backend API',
+    version: '1.0.0',
+    endpoints: {
+      health: '/health',
+      api: '/api',
+      auth: '/api/auth',
+      orders: '/api/orders',
+      suppliers: '/api/suppliers',
+      products: '/api/products',
+      freightHandlers: '/api/freight-handlers'
+    }
+  });
+});
 
 // API Routes
 app.use('/api/auth', authRoutes);
