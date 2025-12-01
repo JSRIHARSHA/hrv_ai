@@ -1,0 +1,263 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    DATABASE ENTITY RELATIONSHIP DIAGRAM                       ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                  USERS                                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  PK  │ id                    │ INTEGER (Auto-increment)                     │
+│  UK  │ userId                │ STRING (Unique)                              │
+│  UK  │ email                 │ STRING (Unique, Email validation)           │
+│      │ name                  │ STRING                                      │
+│      │ password              │ STRING (Hashed)                             │
+│      │ role                  │ ENUM (Employee, Manager, Management, Admin)  │
+│      │ team                  │ STRING (Optional)                            │
+│      │ isActive              │ BOOLEAN (Default: true)                       │
+│      │ lastLogin             │ DATE (Optional)                              │
+│      │ createdAt             │ DATETIME                                    │
+│      │ updatedAt             │ DATETIME                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    │ (Referenced in orders.createdBy JSONB)
+                                    │ (Referenced in orders.assignedTo JSONB)
+                                    │
+                                    │ [Potential: FK relationships]
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                  ORDERS                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  PK  │ id                    │ INTEGER (Auto-increment)                     │
+│  UK  │ orderId               │ STRING (Unique)                              │
+│      │ createdAt             │ DATETIME                                    │
+│      │ createdBy             │ JSONB (User info)                            │
+│      │                       │   → Could be FK to users.id                  │
+│      │ customer              │ JSONB (ContactInfo)                          │
+│      │ supplier              │ JSONB (ContactInfo)                          │
+│      │                       │   → Could be FK to suppliers.id              │
+│      │ materialName           │ STRING                                      │
+│      │ materials              │ JSONB (Array of MaterialItem)                │
+│      │                       │   → Could be junction table                  │
+│      │ quantity               │ JSONB (Quantity)                            │
+│      │ priceToCustomer        │ JSONB (Price)                                │
+│      │ priceFromSupplier      │ JSONB (Price)                                │
+│      │ status                 │ ENUM (18 statuses)                          │
+│      │ documents              │ JSONB (Documents)                            │
+│      │ advancePayment         │ JSONB (AdvancePayment)                      │
+│      │ auditLogs              │ JSONB (Array of AuditLog)                     │
+│      │ comments               │ JSONB (Array of Comment)                    │
+│      │ assignedTo             │ JSONB (User info)                           │
+│      │                       │   → Could be FK to users.id                  │
+│      │ approvalRequests       │ JSONB (Array of ApprovalRequest)             │
+│      │ timeline               │ JSONB (Array of TimelineEvent)               │
+│      │ poNumber               │ STRING                                      │
+│      │ deliveryTerms          │ STRING                                      │
+│      │ incoterms              │ STRING                                      │
+│      │ eta                    │ STRING                                      │
+│      │ notes                  │ TEXT                                        │
+│      │ freightHandler         │ JSONB (FreightHandler)                       │
+│      │ hsnCode                │ STRING                                      │
+│      │ enquiryNo              │ STRING                                      │
+│      │ upc                    │ STRING                                      │
+│      │ ean                    │ STRING                                      │
+│      │ mpn                    │ STRING                                      │
+│      │ isbn                   │ STRING                                      │
+│      │ inventoryAccount       │ STRING                                      │
+│      │ inventoryValuationMethod│ STRING                                     │
+│      │ supplierPOGenerated    │ BOOLEAN                                     │
+│      │ supplierPOSent         │ BOOLEAN                                     │
+│      │ paymentDetails         │ JSONB (PaymentDetails)                      │
+│      │ rfid                   │ STRING                                      │
+│      │ entity                 │ ENUM (HRV, NHG)                             │
+│      │ orderType              │ ENUM (Direct PO, Sample PO, Service PO)     │
+│      │ logisticsSubStatus     │ STRING                                      │
+│      │ logisticsDocuments     │ JSONB (LogisticsDocuments)                  │
+│      │ discount               │ JSONB (Discount)                             │
+│      │ tds                    │ JSONB (TDS)                                  │
+│      │ tcs                    │ JSONB (TCS)                                  │
+│      │ adjustment             │ DECIMAL(10,2)                                │
+│      │ updatedAt              │ DATETIME                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    │ (supplier JSONB contains supplier info)
+                                    │
+                                    │ [Potential: FK to suppliers.id]
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                SUPPLIERS                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  PK  │ id                    │ INTEGER (Auto-increment)                     │
+│  UK  │ supplierId            │ STRING (Unique, e.g., SUP001)               │
+│      │ name                  │ STRING                                      │
+│      │ address               │ TEXT                                        │
+│      │ city                  │ STRING                                      │
+│      │ state                 │ STRING                                      │
+│      │ country               │ STRING (Default: 'India')                    │
+│      │ email                 │ STRING (Email validation)                    │
+│      │ phone                 │ STRING                                      │
+│      │ gstin                 │ STRING                                      │
+│      │ sourceOfSupply        │ STRING (e.g., TS, GJ, MH)                     │
+│      │ billingAddress        │ TEXT                                        │
+│      │ billingStreet2        │ STRING                                      │
+│      │ billingCity          │ STRING                                      │
+│      │ billingState         │ STRING                                      │
+│      │ billingCountry       │ STRING                                      │
+│      │ shippingAddress       │ TEXT                                        │
+│      │ shippingStreet2       │ STRING                                      │
+│      │ shippingCity         │ STRING                                      │
+│      │ shippingState        │ STRING                                      │
+│      │ shippingCountry      │ STRING                                      │
+│      │ specialties           │ JSONB (Array of strings)                     │
+│      │ rating                │ DECIMAL(3,2) (0-5, Default: 0)               │
+│      │ lastOrderDate         │ DATE                                        │
+│      │ isActive              │ BOOLEAN (Default: true)                        │
+│      │ notes                 │ TEXT                                        │
+│      │ createdAt             │ DATETIME                                    │
+│      │ updatedAt             │ DATETIME                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    │ 1 (One-to-Many)
+                                    │
+                                    │ has many
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                MATERIALS                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  PK  │ id                    │ INTEGER (Auto-increment)                     │
+│  UK  │ itemId                │ STRING (Unique, from CSV)                   │
+│  FK  │ supplierId            │ INTEGER → suppliers.id                     │
+│      │                       │   (NULL allowed, SET NULL on delete)        │
+│      │ itemName              │ STRING                                      │
+│      │ sku                   │ STRING                                      │
+│      │ upc                   │ STRING                                      │
+│      │ isReturnableItem      │ BOOLEAN                                     │
+│      │ hsnSac                │ STRING                                      │
+│      │ dimensionUnit         │ STRING (Default: 'cm')                      │
+│      │ weightUnit            │ STRING (Default: 'kg')                      │
+│      │ isReceivableService   │ BOOLEAN                                     │
+│      │ taxable               │ BOOLEAN                                     │
+│      │ taxabilityType        │ STRING                                      │
+│      │ productType           │ STRING                                      │
+│      │ categoryName          │ STRING                                      │
+│      │ parentCategory        │ STRING                                      │
+│      │ intraStateTaxName     │ STRING                                      │
+│      │ intraStateTaxRate     │ DECIMAL(5,2)                                 │
+│      │ intraStateTaxType     │ STRING                                      │
+│      │ interStateTaxName     │ STRING                                      │
+│      │ interStateTaxRate      │ DECIMAL(5,2)                                │
+│      │ interStateTaxType      │ STRING                                      │
+│      │ source                │ STRING                                      │
+│      │ referenceId           │ STRING                                      │
+│      │ lastSyncTime          │ DATETIME                                    │
+│      │ status                │ STRING (Default: 'Active')                   │
+│      │ usageUnit             │ STRING                                      │
+│      │ unitName              │ STRING                                      │
+│      │ defaultSalesUnitName  │ STRING                                      │
+│      │ defaultSalesUnitSymbol│ STRING                                      │
+│      │ defaultPurchaseUnitName│ STRING                                      │
+│      │ defaultPurchaseUnitSymbol│ STRING                                    │
+│      │ inventoryAccount      │ STRING                                      │
+│      │ inventoryAccountCode  │ STRING                                      │
+│      │ inventoryValuationMethod│ STRING                                    │
+│      │ reorderPoint          │ INTEGER                                     │
+│      │ vendor                │ STRING (Vendor name from CSV)                │
+│      │ warehouseName         │ STRING                                      │
+│      │ openingStock          │ INTEGER                                     │
+│      │ openingStockValue     │ DECIMAL(10,2)                                │
+│      │ stockOnHand           │ INTEGER (Default: 0)                          │
+│      │ itemType              │ STRING                                      │
+│      │ createdAt             │ DATETIME                                    │
+│      │ updatedAt             │ DATETIME                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    │ (Referenced in orders.materials JSONB)
+                                    │
+                                    │ [Potential: Junction table for orders]
+                                    │
+                                    ▼
+                            ┌───────────────┐
+                            │  ORDERS        │
+                            │  (materials   │
+                            │   JSONB)      │
+                            └───────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+                            RELATIONSHIP SUMMARY
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ IMPLEMENTED RELATIONSHIPS (Foreign Keys)                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  1. MATERIALS → SUPPLIERS (Many-to-One)                                      │
+│     • Foreign Key: materials.supplierId → suppliers.id                       │
+│     • Cascade: SET NULL on supplier delete                                  │
+│     • Access: material.supplier or material.getSupplier()                    │
+│     • Reverse: supplier.materials or supplier.getMaterials()                │
+│                                                                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ POTENTIAL RELATIONSHIPS (Currently JSONB, Can Be Enhanced)                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  2. ORDERS → SUPPLIERS (Many-to-One)                                         │
+│     • Current: orders.supplier (JSONB)                                      │
+│     • Potential: Add orders.supplierId → suppliers.id FK                    │
+│     • Would enable: order.supplier (Sequelize relationship)                 │
+│                                                                               │
+│  3. ORDERS → MATERIALS (Many-to-Many)                                      │
+│     • Current: orders.materials (JSONB array)                               │
+│     • Potential: Create order_materials junction table:                      │
+│       - orderId → orders.id                                                  │
+│       - materialId → materials.id                                            │
+│       - quantity, unitPrice, totalPrice (order-specific data)               │
+│     • Would enable: order.materials and material.orders                     │
+│                                                                               │
+│  4. ORDERS → USERS (Many-to-One)                                            │
+│     • Current: orders.createdBy, orders.assignedTo (JSONB)                  │
+│     • Potential: Add orders.createdById → users.id                           │
+│     • Potential: Add orders.assignedToId → users.id                         │
+│     • Would enable: order.creator, order.assignee                            │
+│                                                                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+                              CARDINALITY
+═══════════════════════════════════════════════════════════════════════════════
+
+USERS
+  │
+  │ (1) ──────── (0..N) ORDERS (via createdBy/assignedTo JSONB)
+  │
+  └─── [Potential: 1 ──── N via FK]
+
+SUPPLIERS
+  │
+  │ (1) ──────── (0..N) MATERIALS (via supplierId FK) ✓ IMPLEMENTED
+  │
+  └─── (1) ──────── (0..N) ORDERS (via supplier JSONB)
+      └─── [Potential: 1 ──── N via FK]
+
+MATERIALS
+  │
+  │ (N) ──────── (1) SUPPLIERS (via supplierId FK) ✓ IMPLEMENTED
+  │
+  └─── (N) ──────── (0..N) ORDERS (via materials JSONB)
+      └─── [Potential: N ──── M via junction table]
+
+ORDERS
+  │
+  ├─── (N) ──────── (1) USERS (via createdBy/assignedTo JSONB)
+  │   └─── [Potential: N ──── 1 via FK]
+  │
+  ├─── (N) ──────── (1) SUPPLIERS (via supplier JSONB)
+  │   └─── [Potential: N ──── 1 via FK]
+  │
+  └─── (N) ──────── (0..N) MATERIALS (via materials JSONB)
+      └─── [Potential: N ──── M via junction table]
+
+═══════════════════════════════════════════════════════════════════════════════
+

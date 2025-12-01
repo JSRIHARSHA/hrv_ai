@@ -1,17 +1,38 @@
 const Order = require('../models/Order');
+const { Op } = require('sequelize');
 
 // Get all orders
 exports.getAllOrders = async (req, res) => {
   try {
     const { status, entity, assignedTo, createdBy } = req.query;
-    const filter = {};
+    const where = {};
 
-    if (status) filter.status = status;
-    if (entity) filter.entity = entity;
-    if (assignedTo) filter['assignedTo.userId'] = assignedTo;
-    if (createdBy) filter['createdBy.userId'] = createdBy;
+    if (status) where.status = status;
+    if (entity) where.entity = entity;
+    // For JSONB fields, we'll filter in JavaScript after fetching
+    // PostgreSQL JSONB queries are complex, so we fetch and filter
 
-    const orders = await Order.find(filter).sort({ createdAt: -1 });
+    let orders = await Order.findAll({
+      where,
+      order: [['createdAt', 'DESC']]
+    });
+
+    // Filter by assignedTo if provided
+    if (assignedTo) {
+      orders = orders.filter(order => {
+        const assigned = order.assignedTo;
+        return assigned && assigned.userId === assignedTo;
+      });
+    }
+
+    // Filter by createdBy if provided
+    if (createdBy) {
+      orders = orders.filter(order => {
+        const created = order.createdBy;
+        return created && created.userId === createdBy;
+      });
+    }
+
     res.json({ orders });
   } catch (error) {
     console.error('Get all orders error:', error);
@@ -22,7 +43,7 @@ exports.getAllOrders = async (req, res) => {
 // Get order by ID
 exports.getOrderById = async (req, res) => {
   try {
-    const order = await Order.findOne({ orderId: req.params.orderId });
+    const order = await Order.findOne({ where: { orderId: req.params.orderId } });
     
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
@@ -41,13 +62,12 @@ exports.createOrder = async (req, res) => {
     const orderData = req.body;
     
     // Check if order already exists
-    const existingOrder = await Order.findOne({ orderId: orderData.orderId });
+    const existingOrder = await Order.findOne({ where: { orderId: orderData.orderId } });
     if (existingOrder) {
       return res.status(400).json({ error: 'Order with this ID already exists' });
     }
 
-    const order = new Order(orderData);
-    await order.save();
+    const order = await Order.create(orderData);
 
     res.status(201).json({ message: 'Order created successfully', order });
   } catch (error) {
@@ -62,15 +82,16 @@ exports.updateOrder = async (req, res) => {
     const { orderId } = req.params;
     const updates = req.body;
 
-    const order = await Order.findOneAndUpdate(
-      { orderId },
-      { $set: updates },
-      { new: true, runValidators: true }
-    );
+    const [updatedRowsCount] = await Order.update(updates, {
+      where: { orderId },
+      returning: true
+    });
 
-    if (!order) {
+    if (updatedRowsCount === 0) {
       return res.status(404).json({ error: 'Order not found' });
     }
+
+    const order = await Order.findOne({ where: { orderId } });
 
     res.json({ message: 'Order updated successfully', order });
   } catch (error) {
@@ -85,7 +106,7 @@ exports.updateOrderStatus = async (req, res) => {
     const { orderId } = req.params;
     const { newStatus, note } = req.body;
 
-    const order = await Order.findOne({ orderId });
+    const order = await Order.findOne({ where: { orderId } });
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
@@ -103,7 +124,10 @@ exports.updateOrderStatus = async (req, res) => {
       newValue: newStatus,
       note: note || `Status changed to ${newStatus}`,
     };
-    order.auditLogs.push(auditLog);
+    
+    const auditLogs = Array.isArray(order.auditLogs) ? [...order.auditLogs] : [];
+    auditLogs.push(auditLog);
+    order.auditLogs = auditLogs;
 
     // Add timeline event
     const timelineEvent = {
@@ -118,7 +142,10 @@ exports.updateOrderStatus = async (req, res) => {
       details: note || `Status changed from ${oldStatus} to ${newStatus}`,
       status: newStatus,
     };
-    order.timeline.push(timelineEvent);
+    
+    const timeline = Array.isArray(order.timeline) ? [...order.timeline] : [];
+    timeline.push(timelineEvent);
+    order.timeline = timeline;
 
     await order.save();
 
@@ -135,7 +162,7 @@ exports.addComment = async (req, res) => {
     const { orderId } = req.params;
     const { message, isInternal } = req.body;
 
-    const order = await Order.findOne({ orderId });
+    const order = await Order.findOne({ where: { orderId } });
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
@@ -149,7 +176,9 @@ exports.addComment = async (req, res) => {
       isInternal: isInternal !== undefined ? isInternal : true,
     };
 
-    order.comments.push(comment);
+    const comments = Array.isArray(order.comments) ? [...order.comments] : [];
+    comments.push(comment);
+    order.comments = comments;
     await order.save();
 
     res.json({ message: 'Comment added successfully', comment });
@@ -165,7 +194,7 @@ exports.addTimelineEvent = async (req, res) => {
     const { orderId } = req.params;
     const { event, details, status } = req.body;
 
-    const order = await Order.findOne({ orderId });
+    const order = await Order.findOne({ where: { orderId } });
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
@@ -183,7 +212,9 @@ exports.addTimelineEvent = async (req, res) => {
       status: status || order.status,
     };
 
-    order.timeline.push(timelineEvent);
+    const timeline = Array.isArray(order.timeline) ? [...order.timeline] : [];
+    timeline.push(timelineEvent);
+    order.timeline = timeline;
     await order.save();
 
     res.json({ message: 'Timeline event added successfully', timelineEvent });
@@ -199,7 +230,7 @@ exports.attachDocument = async (req, res) => {
     const { orderId } = req.params;
     const { documentType, documentData, filename } = req.body;
 
-    const order = await Order.findOne({ orderId });
+    const order = await Order.findOne({ where: { orderId } });
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
@@ -217,7 +248,9 @@ exports.attachDocument = async (req, res) => {
       data: documentData,
     };
 
-    order.documents[documentType] = document;
+    const documents = order.documents || {};
+    documents[documentType] = document;
+    order.documents = documents;
     await order.save();
 
     res.json({ message: 'Document attached successfully', document });
@@ -232,8 +265,9 @@ exports.deleteOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
 
-    const order = await Order.findOneAndDelete({ orderId });
-    if (!order) {
+    const deletedRowsCount = await Order.destroy({ where: { orderId } });
+    
+    if (deletedRowsCount === 0) {
       return res.status(404).json({ error: 'Order not found' });
     }
 
@@ -248,14 +282,24 @@ exports.deleteOrder = async (req, res) => {
 exports.getUserOrders = async (req, res) => {
   try {
     const userId = req.user.userId;
+    console.log('Getting orders for user:', userId);
 
-    const orders = await Order.find({
-      $or: [
-        { 'createdBy.userId': userId },
-        { 'assignedTo.userId': userId }
-      ]
-    }).sort({ createdAt: -1 });
+    // Fetch all orders and filter by userId in JSONB fields
+    const allOrders = await Order.findAll({
+      order: [['createdAt', 'DESC']]
+    });
 
+    console.log(`Found ${allOrders.length} total orders in database`);
+
+    const orders = allOrders.filter(order => {
+      const created = order.createdBy;
+      const assigned = order.assignedTo;
+      const matches = (created && created.userId === userId) || 
+                      (assigned && assigned.userId === userId);
+      return matches;
+    });
+
+    console.log(`Filtered to ${orders.length} orders for user ${userId}`);
     res.json({ orders });
   } catch (error) {
     console.error('Get user orders error:', error);
@@ -274,7 +318,9 @@ exports.getTeamOrders = async (req, res) => {
 
     // This would require fetching all users in the team first
     // For now, we'll return orders where assignedTo or createdBy matches the team
-    const orders = await Order.find().sort({ createdAt: -1 });
+    const orders = await Order.findAll({
+      order: [['createdAt', 'DESC']]
+    });
     
     // Filter by team on the application level
     // In a production system, you'd want to optimize this with better queries
@@ -284,4 +330,3 @@ exports.getTeamOrders = async (req, res) => {
     res.status(500).json({ error: 'Error fetching team orders' });
   }
 };
-

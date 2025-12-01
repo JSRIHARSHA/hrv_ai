@@ -9,8 +9,17 @@ exports.register = async (req, res) => {
     const { userId, name, email, password, role, team } = req.body;
 
     // Check if user already exists
-    const existingUser = await User.findOne({ $or: [{ email }, { userId }] });
-    if (existingUser) {
+    const existingUser = await User.findOne({
+      where: {
+        $or: [{ email }, { userId }]
+      }
+    });
+    
+    // Sequelize doesn't support $or directly, so we need to check separately
+    const existingUserByEmail = await User.findOne({ where: { email } });
+    const existingUserById = await User.findOne({ where: { userId } });
+    
+    if (existingUserByEmail || existingUserById) {
       return res.status(400).json({ error: 'User already exists' });
     }
 
@@ -18,7 +27,7 @@ exports.register = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create new user
-    const user = new User({
+    const user = await User.create({
       userId,
       name,
       email,
@@ -28,10 +37,8 @@ exports.register = async (req, res) => {
       isActive: true,
     });
 
-    await user.save();
-
     // Create token
-    const token = jwt.sign({ userId: user._id, email: user.email }, JWT_SECRET, {
+    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
       expiresIn: '24h',
     });
 
@@ -58,20 +65,34 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Find user by email
-    const user = await User.findOne({ email });
+    console.log('Login attempt for email:', email);
+
+    // Find user by email (case-insensitive search)
+    const user = await User.findOne({ 
+      where: { 
+        email: email.toLowerCase().trim() 
+      } 
+    });
+    
     if (!user) {
+      console.log('User not found for email:', email);
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    console.log('User found:', user.email, 'Active:', user.isActive);
+
     // Check if user is active
     if (!user.isActive) {
+      console.log('User account is inactive');
       return res.status(401).json({ error: 'User account is inactive' });
     }
 
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
+    console.log('Password valid:', isPasswordValid);
+    
     if (!isPasswordValid) {
+      console.log('Invalid password for user:', user.email);
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
@@ -81,7 +102,7 @@ exports.login = async (req, res) => {
 
     // Create token
     const token = jwt.sign(
-      { userId: user._id, email: user.email, role: user.role },
+      { userId: user.id, email: user.email, role: user.role },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -107,7 +128,9 @@ exports.login = async (req, res) => {
 // Get current user
 exports.getCurrentUser = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('-password');
+    const user = await User.findByPk(req.user.id, {
+      attributes: { exclude: ['password'] }
+    });
     res.json({ user });
   } catch (error) {
     console.error('Get current user error:', error);
@@ -125,4 +148,3 @@ exports.logout = async (req, res) => {
     res.status(500).json({ error: 'Error logging out' });
   }
 };
-

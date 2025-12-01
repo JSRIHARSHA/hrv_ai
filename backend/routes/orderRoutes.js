@@ -9,11 +9,11 @@ router.use(auth);
 // Order CRUD operations
 router.get('/', orderController.getAllOrders);
 router.get('/my-orders', orderController.getUserOrders);
-router.get('/team-orders', authorize('Manager', 'Higher_Management'), orderController.getTeamOrders);
+router.get('/team-orders', authorize('Manager', 'Management'), orderController.getTeamOrders);
 router.get('/:orderId', orderController.getOrderById);
 router.post('/', orderController.createOrder);
 router.put('/:orderId', orderController.updateOrder);
-router.delete('/:orderId', authorize('Manager', 'Higher_Management', 'Admin'), orderController.deleteOrder);
+router.delete('/:orderId', authorize('Manager', 'Management', 'Admin'), orderController.deleteOrder);
 
 // Order-specific actions
 router.patch('/:orderId/status', orderController.updateOrderStatus);

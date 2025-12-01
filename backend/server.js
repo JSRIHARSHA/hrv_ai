@@ -8,19 +8,37 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 require('dotenv').config();
 
-const connectDB = require('./config/database');
+const { connectDB } = require('./config/database');
 const authRoutes = require('./routes/authRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Connect to MongoDB
+// Connect to PostgreSQL
 connectDB();
 
 // Middleware
 app.use(helmet());
-app.use(cors());
+
+// CORS configuration
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+  : ['http://localhost:3000', 'http://localhost:3001'];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
+
 app.use(express.json({ limit: '50mb' })); // Increased limit for base64 file uploads
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -62,18 +80,31 @@ const upload = multer({
 });
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
+  const { sequelize } = require('./config/database');
+  let dbStatus = 'Disconnected';
+  try {
+    await sequelize.authenticate();
+    dbStatus = 'Connected';
+  } catch (error) {
+    dbStatus = 'Disconnected';
+  }
+  
   res.json({ 
     status: 'OK', 
     message: 'Backend API is running',
     timestamp: new Date().toISOString(),
-    database: require('mongoose').connection.readyState === 1 ? 'Connected' : 'Disconnected'
+    database: dbStatus
   });
 });
 
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/suppliers', require('./routes/supplierRoutes'));
+app.use('/api/materials', require('./routes/materialRoutes'));
+app.use('/api/products', require('./routes/productRoutes'));
+app.use('/api/freight-handlers', require('./routes/freightHandlerRoutes'));
 
 // PDF extraction endpoint
 app.post('/api/extract-pdf', upload.single('pdf'), async (req, res) => {
@@ -226,16 +257,20 @@ app.use((error, req, res, next) => {
 
 // Start server
 const HOST = process.env.HOST || '0.0.0.0';
-app.listen(PORT, HOST, () => {
-  console.log('🚀 ========================================');
-  console.log(`🚀 Backend API Server running on ${HOST}:${PORT}`);
-  console.log(`📊 MongoDB Database: ${process.env.MONGODB_URI || 'mongodb://localhost:27017/pharma-order-management'}`);
-  console.log(`📁 Upload directory: ${path.resolve('uploads')}`);
-  console.log(`🐍 Python script: ${path.resolve('universal_pdf_extractor.py')}`);
-  console.log(`🔗 Health check: http://localhost:${PORT}/health`);
-  console.log(`🌐 API Base: http://localhost:${PORT}/api`);
-  console.log('🚀 ========================================');
-});
+// Only start the server if not in Vercel serverless environment
+// Vercel will handle the serverless function execution
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, HOST, () => {
+    console.log('🚀 ========================================');
+    console.log(`🚀 Backend API Server running on ${HOST}:${PORT}`);
+    console.log(`📊 PostgreSQL Database: ${process.env.DATABASE_URL || process.env.POSTGRES_DB || 'pharma_order_management'}`);
+    console.log(`📁 Upload directory: ${path.resolve('uploads')}`);
+    console.log(`🐍 Python script: ${path.resolve('universal_pdf_extractor.py')}`);
+    console.log(`🔗 Health check: http://localhost:${PORT}/health`);
+    console.log(`🌐 API Base: http://localhost:${PORT}/api`);
+    console.log('🚀 ========================================');
+  });
+}
 
 module.exports = app;
 

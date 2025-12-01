@@ -1,49 +1,68 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const userSchema = new mongoose.Schema({
+const User = sequelize.define('User', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
   userId: {
-    type: String,
-    required: true,
-    unique: true,
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true
   },
   name: {
-    type: String,
-    required: true,
+    type: DataTypes.STRING,
+    allowNull: false
   },
   email: {
-    type: String,
-    required: true,
+    type: DataTypes.STRING,
+    allowNull: false,
     unique: true,
-    lowercase: true,
-    trim: true,
+    validate: {
+      isEmail: true
+    }
   },
   password: {
-    type: String,
-    required: true,
+    type: DataTypes.STRING,
+    allowNull: false
   },
   role: {
-    type: String,
-    enum: ['Employee', 'Manager', 'Higher_Management', 'Admin'],
-    default: 'Employee',
+    type: DataTypes.ENUM('Employee', 'Manager', 'Management', 'Admin'),
+    defaultValue: 'Employee',
+    allowNull: false
   },
   team: {
-    type: String,
+    type: DataTypes.STRING,
+    allowNull: true
   },
   isActive: {
-    type: Boolean,
-    default: true,
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+    allowNull: false
   },
   lastLogin: {
-    type: Date,
-  },
+    type: DataTypes.DATE,
+    allowNull: true
+  }
 }, {
+  tableName: 'users',
   timestamps: true,
+  underscored: false,
+  indexes: [
+    {
+      unique: true,
+      fields: ['email']
+    },
+    {
+      unique: true,
+      fields: ['userId']
+    },
+    {
+      fields: ['role']
+    }
+  ]
 });
 
-// Index for faster queries
-userSchema.index({ email: 1 });
-userSchema.index({ userId: 1 });
-userSchema.index({ role: 1 });
-
-module.exports = mongoose.model('User', userSchema);
-
+module.exports = User;

@@ -1,6 +1,11 @@
 module.exports = {
-  mongodb: {
-    uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/pharma-order-management',
+  database: {
+    url: process.env.DATABASE_URL || process.env.POSTGRES_DB || 'postgresql://postgres:postgres@localhost:5432/pharma_order_management',
+    host: process.env.POSTGRES_HOST || 'localhost',
+    port: process.env.POSTGRES_PORT || 5432,
+    database: process.env.POSTGRES_DB || 'pharma_order_management',
+    user: process.env.POSTGRES_USER || 'postgres',
+    password: process.env.POSTGRES_PASSWORD || 'postgres',
   },
   server: {
     port: process.env.PORT || 3001,
