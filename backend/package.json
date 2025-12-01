@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "vercel-build": "npm install",
+    "vercel-build": "npm install --include=dev",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
