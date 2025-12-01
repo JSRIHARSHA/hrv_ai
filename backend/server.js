@@ -8,6 +8,14 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 require('dotenv').config();
 
+// Explicitly require pg before database connection to ensure it's available
+try {
+  require('pg');
+} catch (error) {
+  console.error('❌ Failed to load pg package:', error);
+  throw error;
+}
+
 const { connectDB } = require('./config/database');
 const authRoutes = require('./routes/authRoutes');
 const orderRoutes = require('./routes/orderRoutes');
