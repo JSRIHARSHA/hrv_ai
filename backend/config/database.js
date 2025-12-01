@@ -1,6 +1,15 @@
 const { Sequelize } = require('sequelize');
 require('dotenv').config();
 
+// Explicitly require pg to ensure it's loaded
+try {
+  require('pg');
+  console.log('✅ pg package loaded successfully');
+} catch (error) {
+  console.error('❌ Failed to load pg package:', error.message);
+  throw new Error('pg package is required but not installed. Please run: npm install pg');
+}
+
 // PostgreSQL connection configuration
 // Handle both DATABASE_URL and individual variables
 let sequelize;
