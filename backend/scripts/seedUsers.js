@@ -8,6 +8,11 @@ const seedUsers = async () => {
     await connectDB();
 
     console.log('Connected to PostgreSQL');
+    
+    // Sync database tables (create if they don't exist)
+    console.log('\n🔄 Syncing database tables...');
+    await sequelize.sync({ alter: false }); // Only create missing tables, don't alter existing
+    console.log('✅ Tables synced\n');
 
     // Clear existing users (optional - comment out if you don't want to clear)
     // await User.destroy({ where: {}, truncate: true });

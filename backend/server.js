@@ -38,22 +38,61 @@ connectDB().then(connected => {
   dbConnected = false;
 });
 
-// Health check endpoint that doesn't require DB
+// Health check endpoint that also tests DB connection and reports DB error (for debugging)
 app.get('/health', async (req, res) => {
   const { sequelize } = require('./config/database');
   let dbStatus = 'Disconnected';
+  let dbError = null;
+  let dbDiagnostics = {};
+
+  // Check if DATABASE_URL is set
+  const hasDatabaseUrl = !!(process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== '');
+  dbDiagnostics.hasDatabaseUrl = hasDatabaseUrl;
+  
+  if (hasDatabaseUrl) {
+    // Show first and last few chars of URL for debugging (without exposing password)
+    const url = process.env.DATABASE_URL;
+    const urlPreview = url.length > 50 
+      ? `${url.substring(0, 30)}...${url.substring(url.length - 20)}`
+      : url.substring(0, 30) + '...';
+    dbDiagnostics.urlPreview = urlPreview;
+    dbDiagnostics.urlLength = url.length;
+  } else {
+    dbDiagnostics.usingIndividualVars = true;
+    dbDiagnostics.hasHost = !!process.env.POSTGRES_HOST;
+    dbDiagnostics.hasUser = !!process.env.POSTGRES_USER;
+    dbDiagnostics.hasPassword = !!process.env.POSTGRES_PASSWORD;
+    dbDiagnostics.hasDb = !!process.env.POSTGRES_DB;
+  }
+
   try {
-    await sequelize.authenticate();
+    // Set a timeout for the connection test
+    const authenticatePromise = sequelize.authenticate();
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Connection timeout after 10 seconds')), 10000)
+    );
+    
+    await Promise.race([authenticatePromise, timeoutPromise]);
     dbStatus = 'Connected';
   } catch (error) {
     dbStatus = 'Disconnected';
+    dbError = error && error.message ? error.message : String(error);
+    console.error('PostgreSQL connection error in /health:', error);
+    console.error('Error details:', {
+      name: error?.name,
+      code: error?.code,
+      message: error?.message,
+      stack: error?.stack?.substring(0, 500)
+    });
   }
-  
-  res.json({ 
-    status: 'OK', 
+
+  res.json({
+    status: 'OK',
     message: 'Backend API is running',
     timestamp: new Date().toISOString(),
-    database: dbStatus
+    database: dbStatus,
+    dbError: dbError || 'No error details available',
+    diagnostics: dbDiagnostics
   });
 });
 
@@ -65,13 +104,35 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
   : ['http://localhost:3000', 'http://localhost:3001'];
 
+// Always allow localhost for testing (both development and production)
+if (!allowedOrigins.includes('http://localhost:3000')) {
+  allowedOrigins.push('http://localhost:3000');
+}
+if (!allowedOrigins.includes('http://localhost:3001')) {
+  allowedOrigins.push('http://localhost:3001');
+}
+
+// Add Netlify domain if not already included
+if (!allowedOrigins.includes('https://hrv-ai-build1.netlify.app')) {
+  allowedOrigins.push('https://hrv-ai-build1.netlify.app');
+}
+
+console.log('🌐 Allowed CORS origins:', allowedOrigins);
+
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+    // Always allow localhost for testing
+    if (origin.startsWith('http://localhost:')) {
+      return callback(null, true);
+    }
+    // Check against allowed origins
+    if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
+      console.warn('⚠️  CORS blocked origin:', origin);
+      console.warn('⚠️  Allowed origins:', allowedOrigins);
       callback(new Error('Not allowed by CORS'));
     }
   },

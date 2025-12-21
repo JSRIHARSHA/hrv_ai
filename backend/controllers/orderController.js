@@ -12,10 +12,14 @@ exports.getAllOrders = async (req, res) => {
     // For JSONB fields, we'll filter in JavaScript after fetching
     // PostgreSQL JSONB queries are complex, so we fetch and filter
 
+    console.log('Fetching orders with filters:', { status, entity, assignedTo, createdBy });
+
     let orders = await Order.findAll({
       where,
       order: [['createdAt', 'DESC']]
     });
+
+    console.log(`Found ${orders.length} orders in database`);
 
     // Filter by assignedTo if provided
     if (assignedTo) {
@@ -36,7 +40,14 @@ exports.getAllOrders = async (req, res) => {
     res.json({ orders });
   } catch (error) {
     console.error('Get all orders error:', error);
-    res.status(500).json({ error: 'Error fetching orders' });
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error details:', error.errors || error.parent?.message || error);
+    res.status(500).json({ 
+      error: 'Error fetching orders',
+      details: error.message,
+      hint: error.parent?.code === '42P01' ? 'Database tables may not exist. Run syncDatabase.js script.' : undefined
+    });
   }
 };
 
@@ -61,18 +72,70 @@ exports.createOrder = async (req, res) => {
   try {
     const orderData = req.body;
     
+    console.log('Creating order with data:', JSON.stringify(orderData, null, 2));
+    
     // Check if order already exists
     const existingOrder = await Order.findOne({ where: { orderId: orderData.orderId } });
     if (existingOrder) {
       return res.status(400).json({ error: 'Order with this ID already exists' });
     }
 
-    const order = await Order.create(orderData);
+    // Ensure required fields have defaults
+    const orderToCreate = {
+      ...orderData,
+      // Convert createdAt string to Date if provided
+      createdAt: orderData.createdAt ? new Date(orderData.createdAt) : new Date(),
+      // Ensure required JSONB fields are set (cannot be null)
+      createdBy: orderData.createdBy || {
+        userId: req.user?.userId || 'unknown',
+        name: req.user?.name || 'Unknown User',
+        role: req.user?.role || 'Employee'
+      },
+      assignedTo: orderData.assignedTo || {
+        userId: req.user?.userId || 'unknown',
+        name: req.user?.name || 'Unknown User',
+        role: req.user?.role || 'Employee'
+      },
+      customer: orderData.customer || {
+        name: '',
+        address: '',
+        country: '',
+        email: '',
+        phone: '',
+        gstin: ''
+      },
+      // Ensure arrays are arrays
+      materials: Array.isArray(orderData.materials) ? orderData.materials : [],
+      auditLogs: Array.isArray(orderData.auditLogs) ? orderData.auditLogs : [],
+      comments: Array.isArray(orderData.comments) ? orderData.comments : [],
+      approvalRequests: Array.isArray(orderData.approvalRequests) ? orderData.approvalRequests : [],
+      timeline: Array.isArray(orderData.timeline) ? orderData.timeline : [],
+      // Ensure objects are objects
+      documents: orderData.documents || {},
+      // Ensure supplier is null if not provided
+      supplier: orderData.supplier || null,
+      // Ensure required fields have defaults
+      materialName: orderData.materialName || '',
+      quantity: orderData.quantity || { value: 1, unit: 'kg' },
+      priceToCustomer: orderData.priceToCustomer || { amount: 0, currency: 'USD' },
+      priceFromSupplier: orderData.priceFromSupplier || { amount: 0, currency: 'USD' },
+    };
+
+    console.log('Order data prepared for creation');
+    const order = await Order.create(orderToCreate);
+    console.log('Order created successfully:', order.orderId);
 
     res.status(201).json({ message: 'Order created successfully', order });
   } catch (error) {
     console.error('Create order error:', error);
-    res.status(500).json({ error: 'Error creating order' });
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error details:', error.errors || error.parent?.message || error);
+    res.status(500).json({ 
+      error: 'Error creating order',
+      details: error.message,
+      fieldErrors: error.errors ? error.errors.map(e => ({ field: e.path, message: e.message })) : undefined
+    });
   }
 };
 

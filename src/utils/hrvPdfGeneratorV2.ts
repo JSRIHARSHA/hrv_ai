@@ -128,9 +128,9 @@ export class HRVPDFGeneratorV2 {
         month: 'short', 
         year: 'numeric' 
       }),
-      supplier_name: order.supplier.name,
-      supplier_address: order.supplier.address,
-      supplier_gstin: order.supplier.gstin || 'N/A',
+      supplier_name: order.supplier?.name || 'N/A',
+      supplier_address: order.supplier?.address || 'N/A',
+      supplier_gstin: order.supplier?.gstin || 'N/A',
       freight_name: order.freightHandler?.name || 'N/A',
       freight_address: order.freightHandler?.address || 'N/A',
       freight_gstin: order.freightHandler?.gstin || 'N/A',

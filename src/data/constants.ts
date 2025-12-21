@@ -1,61 +1,96 @@
-import { User, Order, OrderStatus, UserRole, StatusTransition, Permission } from '../types';
+import { User, Order, OrderStatus, UserRole, StatusTransition, Permission, LogisticsSubStatus } from '../types';
 
 // Mock Users
 export const mockUsers: User[] = [
   {
     userId: 'user1',
-    name: 'Dr. Sarah Chen',
-    email: 'sarah.chen@company.com',
+    name: 'Test Employee 1',
+    email: 'testemployee1@company.com',
     role: 'Employee',
     team: 'Business Development',
+    department: 'CRM',
     isActive: true,
   },
   {
     userId: 'user2',
-    name: 'Michael Rodriguez',
-    email: 'michael.rodriguez@company.com',
+    name: 'Test Employee 2',
+    email: 'testemployee2@company.com',
     role: 'Employee',
     team: 'Procurement Team 1',
+    department: 'Finance',
     isActive: true,
   },
   {
     userId: 'user3',
-    name: 'Dr. Priya Sharma',
-    email: 'priya.sharma@company.com',
+    name: 'Test Employee 3',
+    email: 'testemployee3@company.com',
     role: 'Employee',
     team: 'Procurement Team 2',
+    department: 'Logistics',
     isActive: true,
   },
   {
     userId: 'user4',
-    name: 'Jennifer Kim',
-    email: 'jennifer.kim@company.com',
+    name: 'Test Employee 4',
+    email: 'testemployee4@company.com',
     role: 'Employee',
     team: 'Finance & Compliance',
+    department: 'Finance',
     isActive: true,
   },
   {
     userId: 'user5',
-    name: 'David Thompson',
-    email: 'david.thompson@company.com',
+    name: 'Test Employee 5',
+    email: 'testemployee5@company.com',
     role: 'Employee',
     team: 'Supply Chain Logistics',
+    department: 'Logistics',
     isActive: true,
   },
   {
     userId: 'user6',
-    name: 'Dr. Robert Martinez',
-    email: 'robert.martinez@company.com',
+    name: 'Siva Nagaraju',
+    email: 'siva.nagaraju@company.com',
     role: 'Manager',
     team: 'Operations Management',
+    department: 'Management',
     isActive: true,
   },
   {
     userId: 'user7',
-    name: 'Dr. Elizabeth Johnson',
-    email: 'elizabeth.johnson@company.com',
-    role: 'Higher_Management',
+    name: 'Vedansh',
+    email: 'vedansh@company.com',
+    role: 'Manager',
+    team: 'Operations Management',
+    department: 'Management',
+    isActive: true,
+  },
+  // Admin users
+  {
+    userId: 'admin001',
+    name: 'Admin',
+    email: 'sriharshajvs@gmail.com',
+    role: 'Management',
     team: 'Executive Leadership',
+    department: 'Management',
+    isActive: true,
+  },
+  {
+    userId: 'admin002',
+    name: 'Admin 1',
+    email: 'sriharsha@hrvpharma.com',
+    role: 'Management',
+    team: 'Executive Leadership',
+    department: 'Management',
+    isActive: true,
+  },
+  {
+    userId: 'admin003',
+    name: 'Sowjanya',
+    email: 'sowjanya.kopperla@hrvpharma.com',
+    role: 'Management',
+    team: 'Executive Leadership',
+    department: 'Management',
     isActive: true,
   },
 ];
@@ -70,9 +105,21 @@ export const statusTransitions: StatusTransition[] = [
   },
   {
     from: 'Drafting_PO_for_Supplier',
+    to: 'Sent_PO_for_Approval',
+    requiredRole: 'Employee',
+    description: 'Employee sends PO for approval',
+  },
+  {
+    from: 'Sent_PO_for_Approval',
+    to: 'PO_Approved',
+    requiredRole: 'Manager',
+    description: 'Manager approves the PO',
+  },
+  {
+    from: 'PO_Approved',
     to: 'PO_Sent_to_Supplier',
     requiredRole: 'Employee',
-    description: 'Employee sends PO to supplier',
+    description: 'Employee sends approved PO to supplier',
   },
   {
     from: 'PO_Sent_to_Supplier',
@@ -195,15 +242,15 @@ export const permissions: Permission[] = [
   },
   {
     action: 'approve_request',
-    roles: ['Manager', 'Higher_Management'],
+    roles: ['Manager', 'Management'],
   },
   {
     action: 'reassign_task',
-    roles: ['Manager'],
+    roles: ['Manager', 'Management'],
   },
   {
     action: 'view_all_orders',
-    roles: ['Manager', 'Higher_Management', 'Admin'],
+    roles: ['Manager', 'Management'],
   },
 ];
 
@@ -211,6 +258,9 @@ export const permissions: Permission[] = [
 export const statusDisplayNames: Record<OrderStatus, string> = {
   PO_Received_from_Client: 'PO Received from Client',
   Drafting_PO_for_Supplier: 'Drafting PO for Supplier',
+  Sent_PO_for_Approval: 'Sent PO for Approval',
+  PO_Rejected: 'PO Rejected',
+  PO_Approved: 'PO Approved',
   PO_Sent_to_Supplier: 'PO Sent to Supplier',
   Proforma_Invoice_Received: 'Proforma Invoice Received',
   Awaiting_COA: 'Awaiting COA',
@@ -229,9 +279,26 @@ export const statusDisplayNames: Record<OrderStatus, string> = {
 // Role Display Names
 export const roleDisplayNames: Record<UserRole, string> = {
   Employee: 'Employee',
-  Manager: 'Operations Manager',
-  Higher_Management: 'Executive Leadership',
-  Admin: 'System Administrator',
+  Manager: 'Manager',
+  Management: 'Management',
+  Admin: 'Admin',
+};
+
+// Logistics Sub-Status Display Names
+export const logisticsSubStatusDisplayNames: Record<LogisticsSubStatus, string> = {
+  Dispatch_Confirmation_Sent: 'Dispatch Confirmation Sent',
+  Awaiting_Documents_from_Supplier: 'Awaiting Documents from Supplier',
+  Drafting_Documents: 'Drafting Documents',
+  Awaiting_Quotation_from_Freight_Handler: 'Awaiting Quotation from Freight Handler',
+  Awaiting_ADC_Clearance: 'Awaiting ADC Clearance',
+  ADC_Clearance_Done: 'ADC Clearance Done',
+  Shipping_Bill_Filed: 'Shipping Bill Filed',
+  Awaiting_Dispatch_Schedule: 'Awaiting Dispatch Schedule',
+  Clearance_Completed: 'Clearance Completed',
+  Received_Air_Way_Bill: 'Received Air Way Bill',
+  Received_Bill_of_Lading: 'Received Bill of Lading',
+  Sending_Documents_to_Customer: 'Sending Documents to Customer',
+  Sent_Documents_to_Customer: 'Sent Documents to Customer',
 };
 
 // Helper Functions
@@ -243,18 +310,27 @@ export const getRoleDisplayName = (role: UserRole): string => {
   return roleDisplayNames[role] || role;
 };
 
+export const getLogisticsSubStatusDisplayName = (subStatus: LogisticsSubStatus): string => {
+  return logisticsSubStatusDisplayNames[subStatus] || subStatus;
+};
+
 // Status color mapping for UI chips
 export const getStatusColor = (
   status: OrderStatus
 ): 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' => {
   switch (status) {
     case 'Completed':
+    case 'PO_Approved':
+    case 'COA_Accepted':
+    case 'Approved':
       return 'success';
     case 'COA_Revision':
+    case 'PO_Rejected':
       return 'error';
     case 'Awaiting_COA':
     case 'Awaiting_Approval':
     case 'Material_to_be_Dispatched':
+    case 'Sent_PO_for_Approval':
       return 'warning';
     case 'In_Transit':
     case 'Material_Dispatched':
@@ -264,8 +340,7 @@ export const getStatusColor = (
     case 'PO_Sent_to_Supplier':
     case 'Proforma_Invoice_Received':
     case 'COA_Received':
-    case 'COA_Accepted':
-    case 'Approved':
+    case 'PO_Received_from_Client':
       return 'primary';
     default:
       return 'default';
@@ -321,7 +396,10 @@ export const getStatusCardColor = (status: OrderStatus, hover = false): string =
   const colors: Record<OrderStatus, string> = {
     PO_Received_from_Client: '#1E3A8A',
     Drafting_PO_for_Supplier: '#1E40AF',
-    PO_Sent_to_Supplier: '#7C4DFF',
+    Sent_PO_for_Approval: '#9333EA',
+    PO_Rejected: '#EF4444',
+    PO_Approved: '#A855F7',
+    PO_Sent_to_Supplier: '#EF721F',
     Proforma_Invoice_Received: '#6B46C1',
     Awaiting_COA: '#F59E0B',
     COA_Received: '#D97706',
@@ -348,6 +426,9 @@ export const getStatusChipLabel = (status: OrderStatus): string => {
   const labels: Record<OrderStatus, string> = {
     PO_Received_from_Client: 'New',
     Drafting_PO_for_Supplier: 'Draft',
+    Sent_PO_for_Approval: 'For Approval',
+    PO_Rejected: 'Rejected',
+    PO_Approved: 'Approved',
     PO_Sent_to_Supplier: 'Sent',
     Proforma_Invoice_Received: 'Invoice',
     Awaiting_COA: 'COA',

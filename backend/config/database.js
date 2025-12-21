@@ -19,6 +19,9 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== '') {
   // Validate that DATABASE_URL is a proper PostgreSQL URL
   const dbUrl = process.env.DATABASE_URL.trim();
   
+  console.log('📝 DATABASE_URL detected, length:', dbUrl.length);
+  console.log('📝 DATABASE_URL starts with:', dbUrl.substring(0, 20) + '...');
+  
   // Check if it's a valid PostgreSQL URL format
   if (!dbUrl.startsWith('postgresql://') && !dbUrl.startsWith('postgres://')) {
     console.warn('⚠️  DATABASE_URL does not start with postgresql:// or postgres://');
@@ -26,7 +29,20 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== '') {
     // Fall through to individual variables
   } else {
     try {
-      sequelize = new Sequelize(dbUrl, {
+      // Check if SSL is required (from URL parameter or Supabase/pooler hostname)
+      const sslEnabled = dbUrl.includes('sslmode=require') || 
+                        dbUrl.includes('supabase') || 
+                        dbUrl.includes('pooler');
+      console.log('📝 Creating Sequelize instance with SSL:', sslEnabled);
+      
+      // Remove sslmode from URL if present (we'll handle SSL via dialectOptions)
+      let cleanDbUrl = dbUrl;
+      if (cleanDbUrl.includes('?sslmode=require')) {
+        cleanDbUrl = cleanDbUrl.replace('?sslmode=require', '').replace('&sslmode=require', '');
+      }
+      
+      // Configure Sequelize with explicit SSL settings for Supabase
+      const sequelizeConfig = {
         dialect: 'postgres',
         logging: process.env.NODE_ENV === 'development' ? console.log : false,
         pool: {
@@ -35,15 +51,23 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== '') {
           acquire: 30000,
           idle: 10000
         },
-        dialectOptions: {
-          ssl: dbUrl.includes('sslmode=require') ? {
+        // Always configure SSL for Supabase/cloud databases
+        dialectOptions: sslEnabled ? {
+          ssl: {
             require: true,
-            rejectUnauthorized: false
-          } : false
-        }
-      });
+            rejectUnauthorized: false  // Accept self-signed certificates (required for Supabase)
+          }
+        } : {}
+      };
+      
+      console.log('📝 SSL configuration:', JSON.stringify(sequelizeConfig.dialectOptions));
+      
+      sequelize = new Sequelize(cleanDbUrl, sequelizeConfig);
+      
+      console.log('✅ Sequelize instance created successfully with DATABASE_URL');
     } catch (error) {
       console.error('❌ Error creating Sequelize instance with DATABASE_URL:', error.message);
+      console.error('❌ Error stack:', error.stack);
       console.error('⚠️  Falling back to individual POSTGRES_* environment variables');
       // Fall through to individual variables
     }

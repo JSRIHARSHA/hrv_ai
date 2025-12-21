@@ -43,6 +43,11 @@ export class AIPDFGenerator {
       // Generate AI content
       const aiContent = await this.generateAIContent(order);
       
+      // Validate supplier exists
+      if (!order.supplier) {
+        throw new Error('Supplier must be selected before generating PDF');
+      }
+      
       // Build PDF data
       const data: PDFGenerationData = {
         orderId: order.orderId,
@@ -287,6 +292,10 @@ This content has been generated for pharmaceutical procurement purposes.`;
    * Add supplier information
    */
   private async addSupplierInfo(data: PDFGenerationData): Promise<void> {
+    if (!data.supplierInfo) {
+      throw new Error('Supplier information is required for PDF generation');
+    }
+
     this.doc.setFontSize(14);
     this.doc.setFont('helvetica', 'bold');
     this.doc.text('SUPPLIER INFORMATION', 20, 125);

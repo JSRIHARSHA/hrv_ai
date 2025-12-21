@@ -77,7 +77,7 @@ const AIPDFGenerationModal: React.FC<AIPDFGenerationModalProps> = ({ open, onClo
       companyName: 'HRVNHG Pharmaceuticals',
       companyAddress: '123 Pharma Street, Healthcare City, HC 12345',
       colors: {
-        primary: '#7C4DFF',
+        primary: '#EF721F',
         secondary: '#6B46C1',
       },
     },
@@ -104,7 +104,7 @@ const AIPDFGenerationModal: React.FC<AIPDFGenerationModalProps> = ({ open, onClo
 Key Insights:
 - Order Value: ${order.priceFromSupplier.amount} ${order.priceFromSupplier.currency}
 - Material Count: ${order.materials.length}
-- Supplier: ${order.supplier.name}
+- Supplier: ${order.supplier?.name || 'Not selected'}
 - Customer: ${order.customer.name}
 
 This analysis provides insights for pharmaceutical procurement optimization.`;
@@ -129,6 +129,11 @@ This analysis provides insights for pharmaceutical procurement optimization.`;
   };
 
   const handleGeneratePreview = async () => {
+    if (!order.supplier) {
+      toast.error('Please select a supplier before generating the PDF');
+      return;
+    }
+    
     setIsPreviewing(true);
     try {
       const dataURL = await previewAISupplierPO(order, aiOptions, formData);
@@ -142,6 +147,11 @@ This analysis provides insights for pharmaceutical procurement optimization.`;
   };
 
   const handleDownload = async () => {
+    if (!order.supplier) {
+      toast.error('Please select a supplier before generating the PDF');
+      return;
+    }
+    
     setIsGenerating(true);
     try {
       await downloadAISupplierPO(order, aiOptions, formData);
@@ -172,6 +182,11 @@ This analysis provides insights for pharmaceutical procurement optimization.`;
   };
 
   const handleSendPO = async () => {
+    if (!order.supplier) {
+      toast.error('Please select a supplier before sending the PO');
+      return;
+    }
+    
     setIsGenerating(true);
     try {
       // Generate PDF first
@@ -181,7 +196,7 @@ This analysis provides insights for pharmaceutical procurement optimization.`;
       addTimelineEvent(
         order.orderId,
         'AI-Generated Supplier PO Sent',
-        `AI-generated Supplier PO sent to ${order.supplier.name}`,
+        `AI-generated Supplier PO sent to ${order.supplier?.name || 'supplier'}`,
         'PO_Sent_to_Supplier'
       );
       
@@ -418,7 +433,7 @@ This analysis provides insights for pharmaceutical procurement optimization.`;
                 <strong>Customer:</strong> {order.customer.name}
               </Typography>
               <Typography variant="body2" gutterBottom>
-                <strong>Supplier:</strong> {order.supplier.name}
+                <strong>Supplier:</strong> {order.supplier?.name || 'Not selected'}
               </Typography>
               <Typography variant="body2" gutterBottom>
                 <strong>Material:</strong> {order.materialName}

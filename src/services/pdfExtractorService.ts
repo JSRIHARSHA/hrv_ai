@@ -55,7 +55,13 @@ export class PDFExtractorService {
         formData.append('pdf', pdfFile);
 
         // Call backend API
-        fetch('http://localhost:3001/api/extract-pdf', {
+        // Ensure API_BASE_URL always ends with /api
+        let API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+        API_BASE_URL = API_BASE_URL.replace(/\/$/, ''); // Remove trailing slash
+        if (!API_BASE_URL.endsWith('/api')) {
+          API_BASE_URL = API_BASE_URL + '/api';
+        }
+        fetch(`${API_BASE_URL}/extract-pdf`, {
           method: 'POST',
           body: formData,
         })
@@ -123,7 +129,14 @@ export class PDFExtractorService {
   /**
    * Convert extracted PDF data to Order object
    */
-  public convertExtractedDataToOrder(extractedData: PDFExtractionResult, uploadedBy: string, selectedSupplier?: ContactInfo, pdfFileData?: string): Order {
+  public convertExtractedDataToOrder(
+    extractedData: PDFExtractionResult, 
+    uploadedBy: string, 
+    selectedSupplier?: ContactInfo, 
+    pdfFileData?: string,
+    entity?: 'HRV' | 'NHG',
+    poNumber?: string
+  ): Order {
     const data = extractedData.data;
     
     // Use selected supplier from dropdown, or create supplier from extracted data as fallback
@@ -137,6 +150,8 @@ export class PDFExtractorService {
     };
 
     // Create material item from extracted data
+    const totalAmount = parseFloat(data.TOTAL_AMOUNT || '0');
+    const extractedCurrency = data.CURRENCY || 'USD';
     const material: MaterialItem = {
       id: `material_${Date.now()}`,
       name: data.MATERIAL || 'Unknown Material',
@@ -147,13 +162,24 @@ export class PDFExtractorService {
       },
       unitPrice: {
         amount: parseFloat(data.UNIT_PRICE || '0'),
-        currency: data.CURRENCY || 'USD'
+        currency: extractedCurrency
       },
       totalPrice: {
-        amount: parseFloat(data.TOTAL_AMOUNT || '0'),
-        currency: data.CURRENCY || 'USD'
+        amount: totalAmount,
+        currency: extractedCurrency
       },
-      hsn: 'N/A' // Could be extracted from PDF if available
+      supplierUnitPrice: {
+        amount: 0,
+        currency: extractedCurrency
+      },
+      supplierTotalPrice: {
+        amount: 0,
+        currency: extractedCurrency
+      },
+      hsn: 'N/A', // Could be extracted from PDF if available
+      account: '',
+      taxRate: 18, // Default tax rate
+      taxAmount: (totalAmount * 0.18) // Calculate 18% tax by default
     };
 
     // Create order from extracted data
@@ -178,8 +204,8 @@ export class PDFExtractorService {
         gstin: data.GSTIN || 'CUSTOMER_GSTIN'
       },
       
-      // Supplier information
-      supplier: supplier,
+      // Supplier information - only set if provided, otherwise null
+      supplier: supplier || null,
       
       // Material information
       materialName: data.MATERIAL || 'Unknown Material',
@@ -203,7 +229,8 @@ export class PDFExtractorService {
       
       // Additional information
       rfid: undefined,
-      entity: 'HRV' as 'HRV' | 'NHG',
+      entity: entity || 'HRV' as 'HRV' | 'NHG',
+      poNumber: poNumber || data.PO_NUMBER || `PO-${Date.now()}`,
       
       // Documents
       documents: {
@@ -255,9 +282,7 @@ export class PDFExtractorService {
         company: 'Default Freight Company',
         address: 'Default Address',
         country: 'India',
-        email: 'freight@example.com',
         phone: 'Default Contact',
-        contactPerson: 'Default Contact Person',
         gstin: 'DEFAULT_GSTIN'
       }
     };

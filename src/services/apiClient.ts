@@ -1,12 +1,12 @@
 import type { PurchaseOrder } from '../types';
 // This function represents the "backend" logic that should be moved to a server.
 // We are importing it here to simulate the full client-server process.
-import { extractPOData } from './geminiService';
+import { extractPOData } from './groqService';
 
 /**
  * Simulates calling a backend API endpoint to extract PO data.
  * In a real application, this function would use `fetch` to send the
- * PDF data to your server, and the server would then call the Gemini API.
+ * PDF data to your server, and the server would then call the AI API.
  * @param pdfBase64 The base64-encoded string of the PDF file.
  * @returns A promise that resolves to the extracted PurchaseOrder data.
  */
@@ -30,7 +30,7 @@ export const extractDataViaBackend = async (pdfBase64: string): Promise<Purchase
   // -------------------------------------------------------------
 
   // --- FOR SIMULATION in this sandboxed environment ---
-  // We call the Gemini service logic directly to demonstrate the flow.
+  // We call the AI service logic directly to demonstrate the flow.
   // In a real app, the `extractPOData` function would live on your server,
   // not in the frontend code, and you would use the fetch logic above.
   console.log("Simulating call to a secure backend API endpoint...");

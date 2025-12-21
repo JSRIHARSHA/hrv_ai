@@ -48,6 +48,10 @@ export class HRVPDFGenerator {
   }
 
   generateHRVPO(order: Order, customData?: Partial<PDFGenerationData>): jsPDF {
+    if (!order.supplier) {
+      throw new Error('Supplier must be selected before generating PDF');
+    }
+    
     const data: PDFGenerationData = {
       orderId: order.orderId,
       supplierInfo: order.supplier,
@@ -150,6 +154,10 @@ export class HRVPDFGenerator {
     this.doc.setFont('helvetica', 'bold');
     this.doc.text('TO:', 120, startY);
     
+    if (!data.supplierInfo) {
+      throw new Error('Supplier information is required for PDF generation');
+    }
+
     this.doc.setFontSize(10);
     this.doc.setFont('helvetica', 'normal');
     this.doc.text(data.supplierInfo.name, 120, startY + 10);

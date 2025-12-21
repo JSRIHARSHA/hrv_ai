@@ -87,3 +87,4 @@ const FreightHandler = sequelize.define('FreightHandler', {
 
 module.exports = FreightHandler;
 
+

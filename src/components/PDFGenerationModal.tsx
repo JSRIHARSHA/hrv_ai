@@ -107,6 +107,12 @@ const PDFGenerationModal: React.FC<PDFGenerationModalProps> = ({ open, onClose, 
   const handleSendPO = async () => {
     setIsGenerating(true);
     try {
+      // Validate supplier exists
+      if (!order.supplier) {
+        toast.error('Please select a supplier before generating the PDF');
+        return;
+      }
+      
       // Generate PDF first
       downloadSupplierPO(order, formData);
       
@@ -114,7 +120,7 @@ const PDFGenerationModal: React.FC<PDFGenerationModalProps> = ({ open, onClose, 
       addTimelineEvent(
         order.orderId,
         'Supplier PO Sent',
-        `Supplier PO sent to ${order.supplier.name}`,
+        `Supplier PO sent to ${order.supplier?.name || 'supplier'}`,
         'PO_Sent_to_Supplier'
       );
       
@@ -204,7 +210,7 @@ const PDFGenerationModal: React.FC<PDFGenerationModalProps> = ({ open, onClose, 
                 <strong>Customer:</strong> {order.customer.name}
               </Typography>
               <Typography variant="body2" gutterBottom>
-                <strong>Supplier:</strong> {order.supplier.name}
+                <strong>Supplier:</strong> {order.supplier?.name || 'Not selected'}
               </Typography>
               <Typography variant="body2" gutterBottom>
                 <strong>Material:</strong> {order.materialName}

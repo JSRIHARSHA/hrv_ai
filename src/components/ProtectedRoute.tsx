@@ -10,6 +10,7 @@ interface ProtectedRouteProps {
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { user, isLoading } = useAuth();
 
+  // Show loading while checking authentication
   if (isLoading) {
     return (
       <Box
@@ -25,7 +26,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     );
   }
 
-  if (!user) {
+  // Check both context state and localStorage as fallback
+  // This handles race conditions where state might not be updated yet
+  const storedUser = localStorage.getItem('user');
+  const hasUser = user || storedUser;
+
+  if (!hasUser) {
     return <Navigate to="/login" replace />;
   }
 

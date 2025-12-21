@@ -58,6 +58,10 @@ const EmailModal: React.FC<EmailModalProps> = ({ open, onClose, order, emailType
 
   // Email templates based on type
   const getEmailTemplate = (): EmailTemplate => {
+    if (!order.supplier) {
+      throw new Error('Supplier must be selected before sending email');
+    }
+    
     const templates = {
       'send-po': {
         id: 'send-po',
@@ -140,7 +144,7 @@ Please proceed with the dispatch process.
 
 Best regards,
 Finance Team`,
-        recipients: [order.supplier.email],
+        recipients: order.supplier ? [order.supplier.email] : [],
         cc: [order.customer.email],
         attachments: order.advancePayment?.paymentProof ? ['payment-proof'] : [],
       },
@@ -178,10 +182,10 @@ Finance Team`,
       
       // Log the action
       const eventDetails = {
-        'send-po': `Supplier PO sent to ${order.supplier.name}`,
+        'send-po': `Supplier PO sent to ${order.supplier?.name || 'supplier'}`,
         'send-coa': `COA sent to ${order.customer.name}`,
         'send-coa-awaitment': `COA awaitment notification sent to ${order.customer.name}`,
-        'send-payment-info': `Payment information sent to ${order.supplier.name}`,
+        'send-payment-info': `Payment information sent to ${order.supplier?.name || 'supplier'}`,
       };
 
       addTimelineEvent(
@@ -327,7 +331,7 @@ Finance Team`,
                     <strong>Customer:</strong> {order.customer.name}
                   </Typography>
                   <Typography variant="body2">
-                    <strong>Supplier:</strong> {order.supplier.name}
+                    <strong>Supplier:</strong> {order.supplier?.name || 'Not selected'}
                   </Typography>
                 </Grid>
                 <Grid item xs={12} sm={6}>

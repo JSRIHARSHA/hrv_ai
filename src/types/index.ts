@@ -2,8 +2,14 @@
 export type UserRole = 
   | 'Employee' 
   | 'Manager' 
-  | 'Higher_Management' 
+  | 'Management'
   | 'Admin';
+
+export type Department = 
+  | 'CRM' 
+  | 'Finance' 
+  | 'Logistics' 
+  | 'Management';
 
 export interface User {
   userId: string;
@@ -11,6 +17,7 @@ export interface User {
   email: string;
   role: UserRole;
   team?: string;
+  department?: Department;
   isActive: boolean;
 }
 
@@ -18,6 +25,9 @@ export interface User {
 export type OrderStatus = 
   | 'PO_Received_from_Client'
   | 'Drafting_PO_for_Supplier'
+  | 'Sent_PO_for_Approval'
+  | 'PO_Rejected'
+  | 'PO_Approved'
   | 'PO_Sent_to_Supplier'
   | 'Proforma_Invoice_Received'
   | 'Awaiting_COA'
@@ -56,6 +66,30 @@ export interface Documents {
   signedPI?: Document;
 }
 
+// Logistics Documents
+export interface LogisticsDocument {
+  id: string;
+  documentType: 'COA' | 'Packing_List' | 'MSDS' | 'GMP' | 'Manufacturer_License' | 'IEC' | 'Drum_Images' | 'Labels' | 'IIP' | 'UN_Certificate' | 'Commercial_Invoice' | 'Tax_Invoice_Documents' | 'Custom_Clearance_Documents' | 'Air_Way_Bill_Bill_of_Lading';
+  document?: Document;
+}
+
+export interface LogisticsDocuments {
+  coa?: LogisticsDocument;
+  packingList?: LogisticsDocument;
+  msds?: LogisticsDocument;
+  gmp?: LogisticsDocument;
+  manufacturerLicense?: LogisticsDocument;
+  iec?: LogisticsDocument;
+  drumImages?: LogisticsDocument;
+  labels?: LogisticsDocument;
+  iip?: LogisticsDocument;
+  unCertificate?: LogisticsDocument;
+  commercialInvoice?: LogisticsDocument;
+  taxInvoiceDocuments?: LogisticsDocument;
+  customClearanceDocuments?: LogisticsDocument;
+  airWayBillBillOfLading?: LogisticsDocument;
+}
+
 // Financial Information
 export interface Price {
   amount: number;
@@ -88,6 +122,8 @@ export interface ContactInfo {
   email: string;
   phone: string;
   gstin?: string;
+  destination?: string; // For Customer - manufacturing plant
+  origin?: string; // For Supplier - manufacturing plant
 }
 
 // Freight Handler Information
@@ -97,14 +133,34 @@ export interface FreightHandler {
   company: string;
   address: string;
   country: string;
-  email: string;
   phone: string;
-  contactPerson: string;
   gstin?: string;
-  trackingNumber?: string;
-  shippingMethod?: string;
-  estimatedDelivery?: string;
   notes?: string;
+}
+
+// Product Master Data
+export interface Product {
+  id: string;
+  itemId: string;
+  itemName: string;
+  sku: string;
+  upc?: string;
+  hsnSac?: string;
+  categoryName?: string;
+  productType?: string;
+  unitName?: string;
+  defaultSalesUnitName?: string;
+  defaultPurchaseUnitName?: string;
+  vendor?: string;
+  warehouseName?: string;
+  status?: string;
+  taxable?: boolean;
+  intraStateTaxRate?: number;
+  interStateTaxRate?: number;
+  inventoryAccount?: string;
+  reorderPoint?: number;
+  stockOnHand?: number;
+  itemType?: string;
 }
 
 // Audit and Comments
@@ -161,22 +217,30 @@ export interface MaterialItem {
   sku?: string;
   hsn?: string;
   quantity: Quantity;
-  unitPrice: Price;
-  totalPrice: Price;
+  unitPrice: Price; // Customer unit price (from extracted PO)
+  totalPrice: Price; // Customer total price (from extracted PO)
   description?: string;
+  itemDescription?: string; // Item description field for display in PDFs
+  account?: string;
+  taxRate?: number; // Tax percentage (e.g., 18 for 18%)
+  taxAmount?: number;
+  // Supplier pricing (user input)
+  supplierUnitPrice?: Price;
+  supplierTotalPrice?: Price;
 }
 
 // Main Order Interface
 export interface Order {
   orderId: string;
   createdAt: string;
+  updatedAt?: string;
   createdBy: {
     userId: string;
     name: string;
     role: UserRole;
   };
   customer: ContactInfo;
-  supplier: ContactInfo;
+  supplier: ContactInfo | null;
   materialName: string;
   materials: MaterialItem[];
   quantity: Quantity;
@@ -191,6 +255,7 @@ export interface Order {
     userId: string;
     name: string;
     role: UserRole;
+    email?: string; // Email for notifications
   };
   approvalRequests: ApprovalRequest[];
   timeline: TimelineEvent[];
@@ -198,6 +263,7 @@ export interface Order {
   deliveryTerms?: string;
   incoterms?: string;
   eta?: string;
+  transitType?: 'Air' | 'Sea' | 'Road' | 'Courier';
   notes?: string;
   freightHandler?: FreightHandler;
   hsnCode?: string;
@@ -210,6 +276,7 @@ export interface Order {
   inventoryValuationMethod?: string;
   supplierPOGenerated?: boolean;
   supplierPOSent?: boolean;
+  supplierComments?: string;
   paymentDetails?: {
     paymentMethod?: string;
     bankDetails?: string;
@@ -219,8 +286,64 @@ export interface Order {
     currency?: string;
   };
   rfid?: string;
+  orderType?: 'Direct PO' | 'Sample PO' | 'Service PO';
   entity?: 'HRV' | 'NHG';
+  logisticsSubStatus?: LogisticsSubStatus;
+  logisticsDocuments?: LogisticsDocuments;
+  discount?: {
+    type: 'percentage' | 'fixed';
+    value: number;
+    amount: number;
+  };
+  tds?: {
+    rate: number; // TDS percentage
+    amount: number;
+    description?: string;
+  };
+  tcs?: {
+    rate: number; // TCS percentage
+    amount: number;
+    description?: string;
+  };
+  adjustment?: number;
+  pendingFieldChanges?: {
+    id: string;
+    requestedBy: {
+      userId: string;
+      name: string;
+    };
+    requestedAt: string;
+    fields: Array<{
+      field: string;
+      oldValue: any;
+      newValue: any;
+    }>;
+    status: 'Pending' | 'Approved' | 'Rejected';
+    approvedBy?: {
+      userId: string;
+      name: string;
+    };
+    approvedAt?: string;
+    comment?: string;
+  };
+  isLocked?: boolean; // Lock all fields when changes are pending approval
 }
+
+// Logistics Sub-Status for Material to be Dispatched status
+export type LogisticsSubStatus = 
+  | 'Dispatch_Confirmation_Sent'
+  | 'Awaiting_Documents_from_Supplier'
+  | 'Drafting_Documents'
+  | 'Awaiting_Quotation_from_Freight_Handler'
+  | 'Awaiting_ADC_Clearance'
+  | 'ADC_Clearance_Done'
+  | 'Shipping_Bill_Filed'
+  | 'Awaiting_Dispatch_Schedule'
+  | 'Clearance_Completed'
+  | 'Received_Air_Way_Bill'
+  | 'Received_Bill_of_Lading'
+  | 'Sending_Documents_to_Customer'
+  | 'Sent_Documents_to_Customer';
 
 // Email Templates
 export interface EmailTemplate {
@@ -261,7 +384,7 @@ export interface PurchaseOrder {
 // PDF Generation Data
 export interface PDFGenerationData {
   orderId: string;
-  supplierInfo: ContactInfo;
+  supplierInfo: ContactInfo | null;
   customerInfo: ContactInfo;
   materials: MaterialItem[];
   poNumber: string;

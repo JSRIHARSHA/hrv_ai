@@ -9,6 +9,10 @@ export class PDFGenerator {
   }
 
   generateSupplierPO(order: Order, customData?: Partial<PDFGenerationData>, entity?: 'HRV' | 'NHG'): jsPDF {
+    if (!order.supplier) {
+      throw new Error('Supplier must be selected before generating PDF');
+    }
+    
     const data: PDFGenerationData = {
       orderId: order.orderId,
       supplierInfo: order.supplier,
@@ -76,6 +80,10 @@ export class PDFGenerator {
 
   private addSupplierInfo(data: PDFGenerationData): void {
     this.doc.setFontSize(14);
+    if (!data.supplierInfo) {
+      throw new Error('Supplier information is required for PDF generation');
+    }
+
     this.doc.setFont('helvetica', 'bold');
     this.doc.text('SUPPLIER INFORMATION', 20, 85);
 
@@ -237,6 +245,10 @@ export class PDFGenerator {
     this.doc.setFont('helvetica', 'bold');
     this.doc.text('SUPPLIER INFORMATION', 20, startY);
     
+    if (!data.supplierInfo) {
+      throw new Error('Supplier information is required for PDF generation');
+    }
+
     this.doc.setFontSize(10);
     this.doc.setFont('helvetica', 'normal');
     this.doc.text(`Company: ${data.supplierInfo.name}`, 20, startY + 10);
@@ -381,6 +393,10 @@ export class PDFGenerator {
     this.doc.setFont('helvetica', 'bold');
     this.doc.text('SUPPLIER INFORMATION', 20, startY);
     
+    if (!data.supplierInfo) {
+      throw new Error('Supplier information is required for PDF generation');
+    }
+
     this.doc.setFontSize(10);
     this.doc.setFont('helvetica', 'normal');
     this.doc.text(`Company: ${data.supplierInfo.name}`, 20, startY + 10);

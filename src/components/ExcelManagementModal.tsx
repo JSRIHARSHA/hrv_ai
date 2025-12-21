@@ -46,7 +46,7 @@ interface ExcelManagementModalProps {
 }
 
 const ExcelManagementModal: React.FC<ExcelManagementModalProps> = ({ open, onClose }) => {
-  const { orders, loadOrdersFromExcel, saveOrdersToExcel, createSampleExcel, isLoading } = useOrders();
+  const { orders, loadOrdersFromExcel, saveOrdersToExcel, createSampleExcel, generateSampleOrders, isLoading } = useOrders();
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [uploadError, setUploadError] = useState<string>('');
   const [downloadStatus, setDownloadStatus] = useState<'idle' | 'downloading' | 'success' | 'error'>('idle');
@@ -117,6 +117,15 @@ const ExcelManagementModal: React.FC<ExcelManagementModalProps> = ({ open, onClo
     }
   };
 
+  const handleGenerateSampleOrders = () => {
+    try {
+      generateSampleOrders();
+      toast.success('Sample orders generated! The page will refresh in a moment to show them.');
+    } catch (error) {
+      toast.error('Failed to generate sample orders');
+    }
+  };
+
   const handleClose = () => {
     setUploadStatus('idle');
     setUploadError('');
@@ -159,7 +168,7 @@ const ExcelManagementModal: React.FC<ExcelManagementModalProps> = ({ open, onClo
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'space-between',
-        bgcolor: '#1a1a2e',
+        bgcolor: '#111111', // Using --background-secondary from CSS
         color: '#FFFFFF',
         borderBottom: '1px solid rgba(255,255,255,0.1)'
       }}>
@@ -174,7 +183,7 @@ const ExcelManagementModal: React.FC<ExcelManagementModalProps> = ({ open, onClo
         </IconButton>
       </DialogTitle>
 
-      <DialogContent sx={{ bgcolor: '#0F0F23', p: 3 }}>
+      <DialogContent sx={{ bgcolor: '#000000', p: 3 }}> {/* Using --background-primary from CSS */}
         {/* Current Data Status */}
         <Card sx={{ mb: 3, bgcolor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
           <CardContent>
@@ -325,6 +334,32 @@ const ExcelManagementModal: React.FC<ExcelManagementModalProps> = ({ open, onClo
                   </Button>
                 </ListItemSecondaryAction>
               </ListItem>
+
+              <Divider sx={{ bgcolor: 'rgba(255,255,255,0.1)', my: 1 }} />
+
+              <ListItem sx={{ px: 0 }}>
+                <ListItemIcon>
+                  <Refresh sx={{ color: '#9CA3AF' }} />
+                </ListItemIcon>
+                <ListItemText
+                  primary="Generate Sample Orders in App"
+                  secondary="Create 36 sample orders (2 per status) directly in the app"
+                  primaryTypographyProps={{ color: '#FFFFFF' }}
+                  secondaryTypographyProps={{ color: 'rgba(255,255,255,0.7)' }}
+                />
+                <ListItemSecondaryAction>
+                  <Button
+                    variant="contained"
+                    onClick={handleGenerateSampleOrders}
+                    sx={{
+                      bgcolor: '#9CA3AF',
+                      '&:hover': { bgcolor: '#6A3FD8' },
+                    }}
+                  >
+                    Generate Orders
+                  </Button>
+                </ListItemSecondaryAction>
+              </ListItem>
             </List>
 
             {downloadStatus !== 'idle' && (
@@ -390,7 +425,7 @@ const ExcelManagementModal: React.FC<ExcelManagementModalProps> = ({ open, onClo
         </Card>
       </DialogContent>
 
-      <DialogActions sx={{ bgcolor: '#1a1a2e', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+      <DialogActions sx={{ bgcolor: '#111111', borderTop: '1px solid rgba(255,255,255,0.1)' }}> {/* Using --background-secondary from CSS */}
         <Button onClick={handleClose} sx={{ color: '#FFFFFF' }}>
           Close
         </Button>

@@ -157,3 +157,4 @@ exports.bulkCreateFreightHandlers = async (req, res) => {
   }
 };
 
+

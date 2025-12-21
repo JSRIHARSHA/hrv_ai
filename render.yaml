@@ -1,13 +1,36 @@
 services:
+  # Backend API Service
   - type: web
-    name: hrv-ai-app
+    name: pharma-backend-api
     env: node
+    region: singapore
     plan: free
-    buildCommand: npm install && npm run build
+    rootDir: backend
+    buildCommand: npm install
     startCommand: node server.js
     envVars:
+      - key: DATABASE_URL
+        sync: false  # Add PostgreSQL connection string manually in Render dashboard
+      - key: JWT_SECRET
+        generateValue: true
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: 3001
+        value: 10000
+      - key: HOST
+        value: 0.0.0.0
     healthCheckPath: /health
+
+  # Frontend Static Site
+  - type: web
+    name: pharma-frontend
+    env: static
+    region: singapore
+    plan: free
+    buildCommand: npm install && npm run build
+    staticPublishPath: build
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://pharma-backend-api.onrender.com/api
+      - key: REACT_APP_GEMINI_API_KEY
+        sync: false  # Add manually in Render dashboard
